@@ -72,12 +72,20 @@ python experiments/exp01_holistic_reference.py
 
 ## Quick start (lab PC, ROS 1 Noetic + Gazebo Classic)
 
-See `ros_ws/INSTALL.md` for first-time setup of TurtleBot 3 +
-OpenManipulator-X dependencies. Once those are in place:
+The lab PC is shared. The full setup is isolated: project lives under
+`~/Desktop/anurag_ws/mobile-grasping/`, the catkin workspace is
+`~/Desktop/anurag_ws/mobile-grasping/ros_ws/`, Python deps install at
+`--user` level, `~/.bashrc` is not modified. See `ros_ws/INSTALL.md`
+for the full procedure (pre-flight check first, only-missing apt
+installs, source clones of `turtlebot3_manipulation_*` into our own
+`src/`, isolated `catkin_make`).
+
+Once the first-time setup is done:
 
 ```bash
-cd ~/catkin_ws
+cd ~/Desktop/anurag_ws/mobile-grasping/ros_ws
 catkin_make
+source /opt/ros/noetic/setup.bash
 source devel/setup.bash
 export TURTLEBOT3_MODEL=waffle
 roslaunch mobile_grasping_ros sim.launch

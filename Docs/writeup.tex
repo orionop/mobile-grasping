@@ -296,7 +296,17 @@ OpenManipulator-X support.
         commands for the lab PC's first-time setup of TurtleBot 3,
         OpenManipulator-X, the \texttt{turtlebot3\_manipulation}
         stack from ROBOTIS-GIT, and the Python solver dependencies
-        (\texttt{qpsolvers}, \texttt{osqp}).
+        (\texttt{qpsolvers}, \texttt{osqp}). The lab machine is
+        shared with other users, so the setup is deliberately
+        isolated: project files live under
+        \texttt{\textasciitilde/Desktop/anurag\_ws/mobile-grasping/},
+        the catkin workspace is the in-repo \texttt{ros\_ws/} folder
+        (no contact with any other workspace on the machine), and
+        Python dependencies install at \texttt{--user} level. The
+        only system-state change is the optional apt installs in
+        step 2 of \texttt{INSTALL.md}, each of which is gated by a
+        pre-flight check so only packages not already present are
+        installed.
 \end{itemize}
 
 \subsection{Status}

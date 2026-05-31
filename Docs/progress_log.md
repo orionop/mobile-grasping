@@ -92,17 +92,25 @@ TurtleBot 3 + OpenManipulator-X.
     the catkin build is hermetic
 - Wrote `ros_ws/INSTALL.md` with explicit apt + source install steps
   for the lab PC (TB3, OpenManipulator-X, `turtlebot3_manipulation` from
-  ROBOTIS-GIT, Python `qpsolvers` + `osqp`).
+  ROBOTIS-GIT, Python `qpsolvers` + `osqp`). The setup is **isolated
+  for a shared lab machine**: project files live under
+  `~/Desktop/anurag_ws/mobile-grasping/`, the catkin workspace is the
+  in-repo `ros_ws/` folder (zero contact with `~/catkin_ws/` or any
+  other user's workspace), Python deps install at `--user` level,
+  `~/.bashrc` is not modified, and apt installs are gated by a
+  pre-flight check so only missing packages are installed.
 - Wrote `ros_ws/README.md` documenting the workspace layout and the
   parent-repo / ROS-package relationship.
 - Updated top-level `README.md` to add the lab PC quick start and the
   expanded layout.
 
 **What this lets the lab PC do tomorrow:**
-- `git pull`
-- Follow `ros_ws/INSTALL.md` once for first-time deps
-- Symlink `ros_ws/src/mobile_grasping_ros` into `~/catkin_ws/src/`
-- `catkin_make` then `source devel/setup.bash`
+- Clone repo into `~/Desktop/anurag_ws/mobile-grasping/`
+- Follow `ros_ws/INSTALL.md` once for first-time deps (pre-flight
+  check first; only install what's missing)
+- `cd ~/Desktop/anurag_ws/mobile-grasping/ros_ws && catkin_make`
+- New terminal: `source /opt/ros/noetic/setup.bash` then
+  `source ~/Desktop/anurag_ws/mobile-grasping/ros_ws/devel/setup.bash`
 - `export TURTLEBOT3_MODEL=waffle`
 - `roslaunch mobile_grasping_ros sim.launch`
 - Expected: Gazebo opens with TB3 Waffle + OpenManipulator-X; three

@@ -41,15 +41,33 @@ the controller-side module. The two copies are kept in sync manually
 for now; a future refactor may install the parent repo as a pip
 dependency in the ROS environment to remove the duplication.
 
-## Lab PC workflow
+## Lab PC workflow (shared machine, isolated workspace)
 
-1. Pull the latest from the GitHub repo.
-2. If `mobile_grasping_ros` is not yet symlinked into `~/catkin_ws/src/`,
-   follow `INSTALL.md` step 3.
-3. `cd ~/catkin_ws && catkin_make`
-4. `source devel/setup.bash`
-5. `export TURTLEBOT3_MODEL=waffle`
-6. `roslaunch mobile_grasping_ros sim.launch`
+The lab PC is shared with other users. This workspace is built and
+sourced in isolation from any other catkin workspace on the machine,
+and Python dependencies are installed at `--user` level so they do not
+affect other lab users.
 
-See `INSTALL.md` for first-time setup of TurtleBot 3 + OpenManipulator-X
-packages from source.
+Project location on the lab PC: `~/Desktop/anurag_ws/mobile-grasping/`
+Catkin workspace: `~/Desktop/anurag_ws/mobile-grasping/ros_ws/`
+
+1. `git pull` from this repo location.
+2. First-time only: follow `INSTALL.md` (apt deps with check-first,
+   source clones of `turtlebot3_manipulation_*` into our own `src/`,
+   `pip3 install --user qpsolvers osqp`).
+3. `cd ~/Desktop/anurag_ws/mobile-grasping/ros_ws && catkin_make`
+4. New terminal:
+
+   ```bash
+   source /opt/ros/noetic/setup.bash
+   source ~/Desktop/anurag_ws/mobile-grasping/ros_ws/devel/setup.bash
+   export TURTLEBOT3_MODEL=waffle
+   roslaunch mobile_grasping_ros sim.launch
+   ```
+
+`~/.bashrc` is intentionally not modified; each terminal opts in by
+sourcing the workspace `setup.bash` once.
+
+See `INSTALL.md` for the full first-time setup, including the
+pre-flight check of what's already installed and the isolation
+principles followed throughout.
