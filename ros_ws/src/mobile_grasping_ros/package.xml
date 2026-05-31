@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>mobile_grasping_ros</name>
+  <version>0.1.0</version>
+  <description>
+    Closed-loop reactive QP controller for on-the-move grasping on
+    TurtleBot 3 Waffle + OpenManipulator-X. Extends Kiyokawa et al.,
+    IEEE/SICE SII 2025, with the Holistic QP formulation of
+    Haviland-Corke RA-L 2022 adapted to a 4-DOF arm.
+  </description>
+
+  <maintainer email="anuragid.work@gmail.com">Anurag Paresh Shetye</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <!-- Core ROS 1 deps -->
+  <depend>rospy</depend>
+  <depend>std_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>tf2_ros</depend>
+  <depend>tf2_geometry_msgs</depend>
+
+  <!-- TurtleBot 3 Manipulation packages (installed via apt or source on lab PC).
+       See ros_ws/INSTALL.md for the install commands. -->
+  <exec_depend>turtlebot3_manipulation_description</exec_depend>
+  <exec_depend>turtlebot3_manipulation_bringup</exec_depend>
+  <exec_depend>turtlebot3_manipulation_gazebo</exec_depend>
+
+  <!-- Gazebo Classic for simulation -->
+  <exec_depend>gazebo_ros</exec_depend>
+
+  <export>
+  </export>
+</package>

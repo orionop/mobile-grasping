@@ -1,0 +1,48 @@
+<?xml version="1.0"?>
+<!--
+  pipeline.launch
+  ===============
+
+  Brings up the three Python nodes that make up the closed-loop
+  controller pipeline:
+
+    - predictor_node    publishes /grasp_pose (fixed pose for bring-up)
+    - estimator_node    republishes /odom as /base_pose
+    - controller_node   solves the QP and publishes /arm_velocity_cmd
+
+  This launch file is intentionally simulator-agnostic: it brings up
+  only our nodes and assumes that /odom and /joint_states are already
+  being published by something else (Gazebo, real hardware, or a bag).
+  Compose it with sim.launch for a full simulation bring-up.
+-->
+<launch>
+
+  <arg name="control_rate_hz" default="200.0"/>
+  <arg name="predictor_rate_hz" default="30.0"/>
+  <arg name="estimator_rate_hz" default="50.0"/>
+
+  <!-- Controller -->
+  <node pkg="mobile_grasping_ros" type="controller_node.py"
+        name="mobile_grasping_controller" output="screen">
+    <rosparam command="load"
+              file="$(find mobile_grasping_ros)/config/controller_params.yaml"/>
+    <param name="control_rate_hz" value="$(arg control_rate_hz)"/>
+  </node>
+
+  <!-- Predictor (placeholder fixed pose for bring-up) -->
+  <node pkg="mobile_grasping_ros" type="predictor_node.py"
+        name="mobile_grasping_predictor" output="screen">
+    <param name="publish_rate_hz" value="$(arg predictor_rate_hz)"/>
+    <param name="x" value="0.5"/>
+    <param name="y" value="0.0"/>
+    <param name="z" value="0.1"/>
+    <param name="frame_id" value="world"/>
+  </node>
+
+  <!-- Estimator -->
+  <node pkg="mobile_grasping_ros" type="estimator_node.py"
+        name="mobile_grasping_estimator" output="screen">
+    <param name="publish_rate_hz" value="$(arg estimator_rate_hz)"/>
+  </node>
+
+</launch>

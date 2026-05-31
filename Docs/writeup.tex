@@ -224,20 +224,89 @@ baseline before sweeping velocities.
 \section{Repository status}
 
 \begin{itemize}[noitemsep]
-  \item \texttt{src/} --- intentionally empty so far; the modular QP
-        solver will land here in the next commit, with the experiment
-        script reduced to a thin wrapper around the module so the same
-        solver code is reused by the ROS node.
+  \item \texttt{src/mobile\_grasping/controller/qp\_solver.py} --- the
+        Holistic QP wrapped as a reusable Python module
+        (\texttt{HolisticQPSolver}, \texttt{HolisticQPConfig}).
   \item \texttt{experiments/exp01\_holistic\_reference.py} --- the
         reference QP described above.
-  \item \texttt{tests/test\_imports.py} --- a small sanity test
-        verifying that all toolchain components import and operate on
-        Apple Silicon.
+  \item \texttt{tests/test\_imports.py} --- toolchain sanity test.
   \item \texttt{Docs/writeup.tex}, \texttt{Docs/writeup.pdf} --- this
         document.
   \item \texttt{Docs/progress\_log.md} --- internal running log of
-        milestones, complementary to this writeup.
+        milestones.
   \item \texttt{pyproject.toml}, \texttt{.gitignore} --- standard.
 \end{itemize}
+
+\clearpage
+
+\section{Update --- ROS 1 Noetic workspace skeleton}
+
+After the Apple-Silicon toolchain validation above, the ROS package
+that will host the controller on the lab Linux machine has been
+authored on the development laptop and committed alongside the
+controller-side Python module. The lab PC currently runs ROS 1 Noetic
+with Gazebo Classic, which removes the gz-sim issues seen with ROS 2
+Jazzy on the same machine and gives the most mature TurtleBot 3 plus
+OpenManipulator-X support.
+
+\subsection{Workspace layout}
+
+\begin{itemize}[noitemsep]
+  \item \texttt{ros\_ws/src/mobile\_grasping\_ros/} --- a single
+        Python-only catkin package with \texttt{package.xml},
+        \texttt{CMakeLists.txt}, and \texttt{setup.py}. Depends on
+        \texttt{rospy}, the standard message packages, and on the
+        ROBOTIS-GIT \texttt{turtlebot3\_manipulation} stack at
+        runtime.
+  \item \texttt{scripts/controller\_node.py} --- subscribes to
+        \texttt{/grasp\_pose}, \texttt{/base\_pose}, and
+        \texttt{/joint\_states}; publishes
+        \texttt{/arm\_velocity\_cmd} at the configured rate
+        (default 200\,Hz). The node instantiates
+        \texttt{HolisticQPSolver} from the package-local
+        \texttt{qp\_solver.py}. Velocity computation is currently a
+        placeholder that publishes zeros; the equality-with-slack
+        and bound-handling pieces are already in the solver, and the
+        kinematics module that supplies $J_{\text{arm}}(q)$ and the
+        Position-Based Servoing wrapper is the next addition.
+  \item \texttt{scripts/predictor\_node.py} --- publishes a fixed
+        \texttt{PoseStamped} on \texttt{/grasp\_pose} at 30\,Hz so
+        the controller has a target during bring-up. This is the
+        seam at which an FCN reimplementation, GG-CNN, or
+        OpenVLA-OFT will later be plugged in without changing the
+        controller node.
+  \item \texttt{scripts/estimator\_node.py} --- subscribes to
+        \texttt{/odom} and republishes the pose component as
+        \texttt{/base\_pose} at 50\,Hz. The full fused estimator
+        (wheel odometry, IMU, RGB-D visual odometry through an
+        \texttt{robot\_localization} EKF) replaces the body of this
+        node later.
+  \item \texttt{config/controller\_params.yaml} --- exposes the
+        control rate, arm and base velocity bounds, slack penalty,
+        and dimensions, so the same controller code can be
+        retargeted between the Panda (reference) and
+        OpenManipulator-X (deployment) by changing the YAML.
+  \item \texttt{launch/pipeline.launch} --- brings up only the three
+        Python nodes against an existing \texttt{/odom} and
+        \texttt{/joint\_states} publisher.
+  \item \texttt{launch/sim.launch} --- composes with
+        \texttt{turtlebot3\_manipulation\_gazebo}'s empty-world
+        launch for a full simulation bring-up.
+  \item \texttt{ros\_ws/INSTALL.md} --- explicit apt and source
+        commands for the lab PC's first-time setup of TurtleBot 3,
+        OpenManipulator-X, the \texttt{turtlebot3\_manipulation}
+        stack from ROBOTIS-GIT, and the Python solver dependencies
+        (\texttt{qpsolvers}, \texttt{osqp}).
+\end{itemize}
+
+\subsection{Status}
+
+Authored and pushed: package skeleton, three Python node stubs,
+launch and configuration files, install documentation. Not yet
+exercised on the lab machine: \texttt{catkin\_make}, Gazebo bring-up,
+topic flow verification. The intent of the next session is to build
+the workspace, confirm that \texttt{roslaunch mobile\_grasping\_ros
+sim.launch} spawns the TB3 Waffle with the OpenManipulator-X in
+Gazebo Classic, and capture topic-rate output for the next update.
 
 \end{document}

@@ -1,0 +1,17 @@
+# controller_params.yaml
+# Tunable parameters for the reactive QP controller.
+# Loaded by controller_node.py via rosparam in the launch file.
+
+# Control loop
+control_rate_hz: 200.0
+
+# Decision-variable dimensions
+n_arm: 4         # OpenManipulator-X
+n_base: 2        # differential-drive virtual joints (theta_dot, x_dot)
+
+# Velocity bounds
+v_max_arm: 1.5   # rad/s (per joint)
+v_max_base: 0.26 # m/s (TB3 Waffle max linear)
+
+# QP slack penalty (higher = tighter tracking, less constraint flexibility)
+slack_penalty: 1.0e6

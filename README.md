@@ -10,12 +10,13 @@ Extending Kiyokawa et al., "Self-Supervised Learning of Grasping Arbitrary Objec
 | Component | Status |
 |---|---|
 | Reference Holistic QP (Panda, Mac) | Validated (exp01) |
+| Reusable Python QP module (`src/mobile_grasping/controller/qp_solver.py`) | Drafted |
+| ROS 1 Noetic catkin package (`ros_ws/src/mobile_grasping_ros/`) | Skeleton (pending lab PC build) |
 | Full Holistic formulation (manipulability + dampers + PBS) | Not started |
 | 4-DOF OMX-X adaptation | Not started |
-| TB3 + OMX-X URDF integration | Not started |
-| Predictor interface (FCN / GG-CNN / OpenVLA) | Not started |
-| Base pose estimation (wheel + IMU + VO) | Not started |
-| ROS integration | Stack TBD (see writeup) |
+| TB3 + OMX-X bring-up in Gazebo Classic | Awaiting lab PC test |
+| Predictor (FCN / GG-CNN / OpenVLA) | Placeholder node only |
+| Base pose estimation (wheel + IMU + VO) | Placeholder node only (republishes /odom) |
 | Real-hardware experiments | Not started |
 
 ## Workflow
@@ -30,14 +31,26 @@ Extending Kiyokawa et al., "Self-Supervised Learning of Grasping Arbitrary Objec
 
 ```
 mobile-grasping/
-├── Docs/              # Writeup for collaborator + internal progress log
+├── Docs/                                # Writeup for collaborator + internal log
 │   ├── writeup.tex
 │   ├── writeup.pdf
 │   └── progress_log.md
-├── src/               # Controller, predictor, pipeline modules
-├── tests/             # Toolchain sanity tests
-├── notebooks/         # Math derivations, numerical sanity checks
-├── experiments/       # Numbered experiment scripts (exp01_*.py, ...)
+├── src/mobile_grasping/                 # Controller-side Python module
+│   └── controller/
+│       └── qp_solver.py                 # Holistic QP, importable
+├── experiments/                         # Standalone experiment scripts
+│   └── exp01_holistic_reference.py
+├── tests/                               # Toolchain sanity tests
+├── notebooks/                           # Math derivations, numerical sanity checks
+├── ros_ws/                              # ROS 1 Noetic catkin workspace
+│   ├── INSTALL.md                       # Lab PC dependency install steps
+│   ├── README.md
+│   └── src/mobile_grasping_ros/         # ROS package wrapping the QP solver
+│       ├── package.xml, CMakeLists.txt, setup.py
+│       ├── launch/                      # sim.launch + pipeline.launch
+│       ├── config/                      # controller_params.yaml
+│       ├── scripts/                     # controller_node, predictor_node, estimator_node
+│       └── src/mobile_grasping_ros/     # qp_solver (copy for hermetic catkin build)
 ├── pyproject.toml
 └── .gitignore
 ```
@@ -55,6 +68,19 @@ python tests/test_imports.py
 
 # Run the Holistic QP reference experiment (Panda, single QP step)
 python experiments/exp01_holistic_reference.py
+```
+
+## Quick start (lab PC, ROS 1 Noetic + Gazebo Classic)
+
+See `ros_ws/INSTALL.md` for first-time setup of TurtleBot 3 +
+OpenManipulator-X dependencies. Once those are in place:
+
+```bash
+cd ~/catkin_ws
+catkin_make
+source devel/setup.bash
+export TURTLEBOT3_MODEL=waffle
+roslaunch mobile_grasping_ros sim.launch
 ```
 
 ## Progress writeup
