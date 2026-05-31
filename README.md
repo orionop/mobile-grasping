@@ -9,30 +9,40 @@ Extending Kiyokawa et al., "Self-Supervised Learning of Grasping Arbitrary Objec
 
 | Component | Status |
 |---|---|
-| Reference Holistic QP (Frankie sim, Mac) | In progress |
+| Reference Holistic QP (Panda, Mac) | Validated (exp01) |
+| Full Holistic formulation (manipulability + dampers + PBS) | Not started |
 | 4-DOF OMX-X adaptation | Not started |
 | TB3 + OMX-X URDF integration | Not started |
 | Predictor interface (FCN / GG-CNN / OpenVLA) | Not started |
 | Base pose estimation (wheel + IMU + VO) | Not started |
-| ROS 2 integration | Not started |
+| ROS integration | Stack TBD (see writeup) |
 | Real-hardware experiments | Not started |
+
+## Workflow
+
+- Code is authored on macOS (M3 Pro) and committed from there.
+- The lab Linux PC pulls from this repo to run simulation and hardware.
+- The Apple Silicon environment validates the controller-side toolchain
+  (Robotics Toolbox, qpsolvers/OSQP) in isolation, without any
+  simulator or ROS runtime dependency.
 
 ## Repo layout
 
 ```
 mobile-grasping/
-├── docs/              # Architecture, derivations, design decisions
-├── src/
-│   ├── controller/    # QP-based reactive controller
-│   ├── predictor/     # Swappable grasp predictor interface
-│   └── pipeline.py    # End-to-end wiring
-├── tests/             # Unit + integration tests
+├── Docs/              # Writeup for collaborator + internal progress log
+│   ├── writeup.tex
+│   ├── writeup.pdf
+│   └── progress_log.md
+├── src/               # Controller, predictor, pipeline modules
+├── tests/             # Toolchain sanity tests
 ├── notebooks/         # Math derivations, numerical sanity checks
-├── experiments/       # Experiment scripts and results
-└── pyproject.toml
+├── experiments/       # Numbered experiment scripts (exp01_*.py, ...)
+├── pyproject.toml
+└── .gitignore
 ```
 
-## Quick start
+## Quick start (macOS, controller-side validation)
 
 ```bash
 # Create Python environment
@@ -40,9 +50,20 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -e .
 
-# Run the Haviland-Corke Holistic reference example (Frankie in Swift simulator)
+# Verify toolchain
+python tests/test_imports.py
+
+# Run the Holistic QP reference experiment (Panda, single QP step)
 python experiments/exp01_holistic_reference.py
 ```
+
+## Progress writeup
+
+The collaborator-facing progress writeup lives at `Docs/writeup.pdf`
+and is the document shared with Prof. Kiyokawa between sync meetings.
+It is rebuilt from `Docs/writeup.tex` via `pdflatex` and committed
+alongside source code changes. The internal day-by-day log lives at
+`Docs/progress_log.md`.
 
 ## References
 

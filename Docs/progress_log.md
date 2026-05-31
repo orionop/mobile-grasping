@@ -10,7 +10,7 @@ Running log of implementation milestones for the on-the-move grasping project.
 working on a MacBook Pro M3 Pro, before moving to ROS 2 / Linux / hardware.
 
 **Done:**
-- Repo structure: `src/`, `docs/`, `tests/`, `notebooks/`, `experiments/`
+- Repo structure: `src/`, `Docs/`, `tests/`, `notebooks/`, `experiments/`
 - Python 3.9 venv in `.venv`
 - Dependencies installed and pinned in `pyproject.toml`:
   - `numpy<2` (roboticstoolbox 1.1 C extensions built against numpy 1.x)
@@ -42,9 +42,17 @@ working on a MacBook Pro M3 Pro, before moving to ROS 2 / Linux / hardware.
 - Non-holonomic differential-drive base kinematics for TB3 Waffle
 
 **Next:**
-- Day 2 (at IITB): set up ROS 2 Jazzy workspace, load TB3 Waffle URDF, load
-  OMX-X URDF, combine into single mobile manipulator URDF, launch in Gazebo
-- Day 3-4: extend `exp01` with manipulability cost + velocity dampers + PBS
-  wrapper, still on Panda for validation
-- Day 5-6: adapt to OMX-X (4-DOF Jacobian, smaller workspace, modified cost
-  weights for reduced redundancy)
+- Decide ROS distribution + simulator combo for the lab PC
+  (candidates: ROS 2 Humble + Gazebo Classic, ROS 2 Jazzy + Gazebo
+  Sim, ROS 1 Noetic + Gazebo Classic). Lab PC currently has a missing
+  pointer issue with gz-sim on Jazzy.
+- Day 2 (at IITB, once stack decided): load combined TB3 + OMX-X URDF,
+  bring up in chosen simulator
+- Day 3-4: extend `exp01` with manipulability cost + velocity dampers
+  + PBS wrapper, still on Panda for validation
+- Day 5-6: adapt to OMX-X (4-DOF Jacobian, smaller workspace, modified
+  cost weights for reduced redundancy)
+
+**Documents:**
+- `Docs/writeup.tex`, `Docs/writeup.pdf` — Kiyokawa-facing progress
+  writeup for this milestone.

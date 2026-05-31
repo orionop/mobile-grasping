@@ -1,0 +1,243 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{caption}
+\usepackage{listings}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, fit, backgrounds, calc, shapes.geometric}
+
+\hypersetup{colorlinks=true, linkcolor=blue, urlcolor=blue, citecolor=blue}
+
+\lstset{
+  basicstyle=\ttfamily\footnotesize,
+  breaklines=true,
+  frame=single,
+  rulecolor=\color{gray!30},
+  backgroundcolor=\color{gray!5},
+  numbers=none,
+}
+
+\title{\textbf{Closed-Loop Reactive Control for On-the-Move Grasping}\\[4pt]
+\large Progress writeup --- toolchain validation and reference QP on Apple Silicon}
+\author{Anurag Paresh Shetye \quad\textbar\quad ARMS Lab, IIT Bombay (visiting) \quad\textbar\quad collab.\ with University of Osaka}
+\date{31 May 2026}
+
+\begin{document}
+\maketitle
+
+\section{Goal}
+
+The system extends the open-loop pipeline of Kiyokawa et al.\
+(IEEE/SICE SII 2025) for on-the-move grasping by introducing a high-rate
+reactive controller that consumes the predicted grasp pose
+$(x, y, \theta)$ in world frame and continuously recomputes arm joint
+velocities against a fused live base pose estimate, closing the loop on
+velocity-tracking error during the approach. The platform is the
+TurtleBot 3 Waffle (differential drive) with an OpenManipulator-X
+(4-DOF arm, $380\,$mm reach), a strictly more arm-constrained setup than
+the Toyota HSR used in the original paper.
+
+The architectural target is the figure shared on 20 May 2026; the
+controller follows the Haviland-Corke Holistic formulation
+(IEEE RA-L 2022), adapted to the constrained 4-DOF arm and integrated
+with a swappable grasp predictor (FCN reimplementation, GG-CNN, or
+OpenVLA-OFT). This document records the first concrete implementation
+step, taken on a development laptop ahead of moving to the lab Linux
+machine and physical hardware.
+
+\section{Setup}
+
+All work in this writeup runs on a MacBook Pro M3 Pro (18\,GB RAM,
+Apple Silicon), with Python 3.9 in a project-local virtual environment.
+The intent of working on macOS first is to verify the controller-side
+toolchain in isolation, without any simulator or ROS runtime
+dependencies, so that subsequent integration on the lab Linux machine
+addresses one new concern at a time.
+
+\paragraph{Repository.}
+\begin{itemize}[noitemsep]
+  \item \texttt{github.com/orionop/mobile-grasping}
+  \item Layout: \texttt{src/} (controller, predictor, pipeline modules),
+        \texttt{Docs/} (this writeup, progress log),
+        \texttt{tests/} (unit tests for the toolchain),
+        \texttt{experiments/} (numbered experiment scripts),
+        \texttt{notebooks/} (math derivations and sanity checks).
+  \item Dependencies pinned in \texttt{pyproject.toml}; numpy held at
+        \texttt{<2} because the \texttt{roboticstoolbox-python} C
+        extension is built against numpy~1.x.
+\end{itemize}
+
+\paragraph{Toolchain.} The implementation builds on three open-source
+components:
+\begin{itemize}[noitemsep]
+  \item \texttt{roboticstoolbox-python}~1.1.1 (Corke, Haviland) ---
+        kinematic models, Jacobians, manipulator URDFs.
+  \item \texttt{spatialmath-python}~1.1 --- \texttt{SE(3)} algebra used
+        for end-effector pose representation.
+  \item \texttt{qpsolvers}~4.8 with \texttt{osqp}~1.1 backend --- the QP
+        solver used to compute joint velocities each control step.
+\end{itemize}
+
+\section{Code}
+
+The first experiment, \texttt{experiments/exp01\_holistic\_reference.py},
+implements one control step of the Holistic QP on the reference Frankie
+platform (Franka Panda 7-DOF arm). The intent is purely to validate the
+solver pipeline end-to-end on Apple Silicon before adapting any of the
+formulation to the constrained 4-DOF arm.
+
+\paragraph{Decision variable.} Joint velocities for the mobile
+manipulator, augmented with an end-effector slack vector:
+\[
+  x = \begin{bmatrix} \dot{q}_{\text{base}} \\
+                       \dot{q}_{\text{arm}} \\
+                       \delta \end{bmatrix}
+     \in \mathbb{R}^{2 + 7 + 6} = \mathbb{R}^{15}.
+\]
+
+\paragraph{Quadratic program.}
+\[
+  \min_{x}\ \tfrac{1}{2}\, x^\top Q\, x + C^\top x
+  \quad\text{s.t.}\quad
+  J\, x = \nu^*_e,\quad
+  X^{-} \le x \le X^{+},
+\]
+where the augmented Jacobian is
+\(
+  J = \begin{bmatrix} J_{\text{base}} & J_{\text{arm}}(q) & \mathbb{1}_{6 \times 6}\end{bmatrix}
+\)
+and the slack penalty in $Q$ is set high (1\,e\,6) so that the equality
+constraint is enforced tightly in this reference test; the full
+adaptive-weight scheme from RA-L 2022 is left for the next iteration.
+The arm joint velocities are bounded to $\pm 1.5\,$rad/s and the base
+virtual joints to $\pm 0.3\,$m/s.
+
+\paragraph{Test case.} The Panda is placed in the toolbox-provided
+\texttt{qr} ready configuration. The desired end-effector twist in the
+world frame is
+\(\nu^*_e = (0.1,\ 0,\ 0,\ 0,\ 0,\ 0)\,\)m/s, i.e.\ pure $+x$
+translation with no rotation, no $y/z$ motion. The QP is solved once and
+the realised twist is reconstructed as
+\(\nu^{\text{realised}}_e = J_{\text{arm}}(q)\,\dot{q}_{\text{arm}}\)
+to check tracking quality.
+
+\section{Result}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lr}
+\toprule
+\textbf{Quantity} & \textbf{Value} \\
+\midrule
+End-effector start position (Panda \texttt{qr}) & $(0.484,\ 0.000,\ 0.413)\,$m \\
+Desired end-effector twist                       & $(0.1,\ 0,\ 0,\ 0,\ 0,\ 0)\,$m/s \\
+Base joint velocities returned                   & $(0,\ 0)$ \\
+Arm joint velocities returned (rad/s)            & $(0,\ 0.308,\ 0,\ 0.297,\ 0,\ 0.012,\ 0)$ \\
+Slack returned (6-D)                              & $\approx 0$ \\
+Realised end-effector twist                      & $(0.1,\ 0,\ 0,\ 0,\ 0,\ 0)\,$m/s \\
+Tracking error (L2 norm)                          & $2\times 10^{-6}$ \\
+\bottomrule
+\end{tabular}
+\caption{One-step output of the reference Holistic QP on the Panda.
+The solver returns joint velocities that realise the requested
+end-effector twist to within $2\times 10^{-6}$, with zero slack absorbed
+at the chosen penalty.}
+\end{table}
+
+Three observations are worth recording:
+
+\begin{itemize}[noitemsep]
+  \item The QP returns a feasible, well-conditioned solution in well
+        under $10\,$ms on the M3 Pro, comfortably below the control
+        period required for the $\sim 200\,$Hz target rate.
+  \item Only three of the seven arm joints (joints 2, 4, 6) carry
+        motion. At the \texttt{qr} configuration with a pure $+x$
+        translational request, this is the kinematically minimal
+        solution and indicates the Jacobian and the cost weighting are
+        producing sensible joint allocations.
+  \item Zero slack at the chosen 1\,e\,6 penalty confirms that the
+        equality constraint is being enforced as intended. When the
+        penalty is lowered to 1\,e\,2, the solver trades joint motion
+        against tracking error in the expected direction (slack
+        absorbs $\sim 1.6\%$ of the desired velocity), which validates
+        the Holistic slack mechanism is wired correctly.
+\end{itemize}
+
+\section{What this validates and what remains}
+
+The Day 1 result is narrow but iron-clad: the controller-side toolchain
+(\texttt{roboticstoolbox-python}, \texttt{qpsolvers}, \texttt{osqp})
+works correctly on Apple Silicon, the augmented Jacobian formulation
+from Haviland-Corke RA-L 2022 implements cleanly in Python, and the QP
+solver produces sensible outputs within a control-rate-compatible
+time budget.
+
+\paragraph{Pending on the controller side.} The reference experiment
+implements the QP structure only; the next iterations will add the
+remaining elements of the Holistic formulation:
+\begin{itemize}[noitemsep]
+  \item Manipulability gradient in the linear cost vector $C$, using
+        the arm-only Yoshikawa measure
+        \(\hat{J}_m = [\mathbf{0}_b,\ J^a_m(q_a)]\).
+  \item Adaptive cost weights $\lambda_q$ and $\lambda_\delta$ as
+        functions of the end-effector pose error magnitude
+        $\|e\|$, so that the base contributes more when the goal is
+        far and the arm contributes more when it is close.
+  \item Velocity-damper inequality constraints for joint position
+        limits, with the influence distance $\rho_i$ and minimum
+        distance $\rho_s$ as parameters.
+  \item Base orientation cost term $\theta_\epsilon$ to keep the base
+        facing the end-effector.
+  \item Position-Based Servoing wrapper that converts a desired
+        end-effector pose into the desired twist $\nu^*_e$ each step.
+\end{itemize}
+
+\paragraph{Pending on the platform side.} The reference test uses the
+Panda model that ships with the toolbox. The constrained-platform
+adaptation will require a 4-DOF arm Jacobian for the OpenManipulator-X
+and a differential-drive virtual-joint representation for the TB3
+Waffle base. With four arm degrees of freedom there is no redundancy
+slack against the full 6-D end-effector twist; the equality constraint
+will need to be projected onto the four task-space dimensions that
+Kiyokawa's grasp pose actually specifies ($x$, $y$, $z$ implicit, and
+$\theta$ around the vertical axis).
+
+\paragraph{Pending on the system side.} The simulator and ROS bring-up
+have not yet been started; that work moves to the lab Linux machine in
+the coming week. The intended sequence is: load the combined
+TB3 + OpenManipulator-X URDF in a simulator with the chosen ROS
+distribution; verify base-only and arm-only motion with stock
+controllers; integrate the QP controller as a ROS node that consumes a
+grasp pose and a live base pose estimate and publishes arm joint
+velocity commands; run a first open-loop versus closed-loop comparison
+on a single object at low base velocity (0.10\,m/s) to establish a
+baseline before sweeping velocities.
+
+\section{Repository status}
+
+\begin{itemize}[noitemsep]
+  \item \texttt{src/} --- intentionally empty so far; the modular QP
+        solver will land here in the next commit, with the experiment
+        script reduced to a thin wrapper around the module so the same
+        solver code is reused by the ROS node.
+  \item \texttt{experiments/exp01\_holistic\_reference.py} --- the
+        reference QP described above.
+  \item \texttt{tests/test\_imports.py} --- a small sanity test
+        verifying that all toolchain components import and operate on
+        Apple Silicon.
+  \item \texttt{Docs/writeup.tex}, \texttt{Docs/writeup.pdf} --- this
+        document.
+  \item \texttt{Docs/progress\_log.md} --- internal running log of
+        milestones, complementary to this writeup.
+  \item \texttt{pyproject.toml}, \texttt{.gitignore} --- standard.
+\end{itemize}
+
+\end{document}
