@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mobile-grasping"
+version = "0.1.0"
+description = "Closed-loop reactive control for on-the-move grasping"
+authors = [{name = "Anurag Paresh Shetye", email = "anuragid.work@gmail.com"}]
+requires-python = ">=3.9"
+dependencies = [
+    "numpy>=1.24,<2",  # roboticstoolbox-python 1.1 C extensions built against numpy 1.x
+    "scipy>=1.10",
+    "roboticstoolbox-python>=1.1",
+    "spatialmath-python>=1.1",
+    "swift-sim>=1.1",
+    "qpsolvers>=4.0",
+    "osqp>=0.6",
+    "matplotlib>=3.7",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4",
+    "jupyter>=1.0",
+    "ipykernel>=6.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
