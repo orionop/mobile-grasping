@@ -73,7 +73,9 @@ present. Install only the missing ones from the list below. Run
 each `apt install` individually so the others remain untouched if
 one is unwanted.
 
-Required apt packages:
+Required apt packages (aligned with the official ROBOTIS
+TurtleBot3 + OpenManipulator-X documentation,
+https://emanual.robotis.com/docs/en/platform/turtlebot3/manipulation/):
 
 | Package | Purpose |
 |---|---|
@@ -85,11 +87,10 @@ Required apt packages:
 | `ros-noetic-robotis-manipulator` | ROBOTIS manipulator base classes |
 | `ros-noetic-gazebo-ros-pkgs` | Gazebo Classic ROS integration |
 | `ros-noetic-gazebo-ros-control` | Gazebo controller plugin |
-| `ros-noetic-effort-controllers` | Joint effort controllers |
-| `ros-noetic-joint-state-controller` | Joint state publisher |
-| `ros-noetic-position-controllers` | Joint position controllers |
-| `ros-noetic-ros-control` | ros_control framework |
-| `ros-noetic-ros-controllers` | Standard controller implementations |
+| `ros-noetic-ros-control*` | ros_control framework (umbrella, per ROBOTIS docs) |
+| `ros-noetic-control*` | Standard controllers (umbrella, per ROBOTIS docs) |
+| `ros-noetic-moveit*` | MoveIt for the arm (used by `turtlebot3_manipulation_moveit_config`) |
+| `ros-noetic-dwa-local-planner` | Local planner used by TB3 navigation |
 | `ros-noetic-xacro` | URDF macro processor |
 
 To install only the missing ones, for each package not in your
@@ -114,12 +115,16 @@ workspace.
 ```bash
 cd ~/Desktop/anurag_ws/mobile-grasping/ros_ws/src/
 
-git clone -b noetic-devel \
+git clone -b noetic \
   https://github.com/ROBOTIS-GIT/turtlebot3_manipulation.git
-git clone -b noetic-devel \
+git clone -b noetic \
   https://github.com/ROBOTIS-GIT/turtlebot3_manipulation_simulations.git
 git clone https://github.com/ROBOTIS-GIT/open_manipulator_dependencies.git
 ```
+
+The branch name is `noetic` (per the official ROBOTIS docs), not
+`noetic-devel`. Confirmed against
+https://emanual.robotis.com/docs/en/platform/turtlebot3/manipulation/.
 
 Now `ros_ws/src/` contains:
 
@@ -205,17 +210,45 @@ rospack find turtlebot3_manipulation_gazebo  # should print our path
 
 ---
 
-## 7. Launch the simulation
+## 7a. Verification — run the official ROBOTIS tutorial first
+
+Before launching our own composite `sim.launch`, run the official
+ROBOTIS `turtlebot3_manipulation_gazebo.launch` standalone. This
+isolates "does the platform work in Gazebo?" from "does my code
+launch correctly?".
 
 ```bash
-export TURTLEBOT3_MODEL=waffle
+export TURTLEBOT3_MODEL=waffle_pi
+roslaunch turtlebot3_manipulation_gazebo turtlebot3_manipulation_gazebo.launch
+```
+
+Expected:
+
+- Gazebo Classic opens and spawns the TB3 Waffle Pi with the
+  OpenManipulator-X mounted on top.
+- The robot stands still in an empty world.
+- `rostopic list` (in another terminal, with the workspace sourced)
+  shows topics including `/joint_states`, `/odom`, `/cmd_vel`,
+  arm joint controllers, etc.
+
+If this works, the platform install is correct. If it fails, the
+problem is in the ROBOTIS install (step 2–5), not our code. Reference:
+https://emanual.robotis.com/docs/en/platform/turtlebot3/manipulation/
+
+## 7b. Launch our composite simulation
+
+Once 7a is verified, run our launch file, which wraps the same
+ROBOTIS Gazebo bring-up and adds our three nodes on top:
+
+```bash
+export TURTLEBOT3_MODEL=waffle_pi
 roslaunch mobile_grasping_ros sim.launch
 ```
 
 Expected:
 
-- Gazebo Classic opens, spawns the TB3 Waffle + OpenManipulator-X.
-- Terminal shows three nodes starting:
+- Same Gazebo Classic scene as in 7a.
+- Terminal additionally shows three nodes starting:
   `mobile_grasping_controller`, `mobile_grasping_predictor`,
   `mobile_grasping_estimator`.
 

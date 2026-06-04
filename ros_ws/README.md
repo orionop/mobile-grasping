@@ -61,9 +61,17 @@ Catkin workspace: `~/Desktop/anurag_ws/mobile-grasping/ros_ws/`
    ```bash
    source /opt/ros/noetic/setup.bash
    source ~/Desktop/anurag_ws/mobile-grasping/ros_ws/devel/setup.bash
-   export TURTLEBOT3_MODEL=waffle
+   export TURTLEBOT3_MODEL=waffle_pi
+
+   # Verify the platform install first (official ROBOTIS launch, no extras)
+   roslaunch turtlebot3_manipulation_gazebo turtlebot3_manipulation_gazebo.launch
+
+   # Once that works, launch the full pipeline (Gazebo + our 3 nodes)
    roslaunch mobile_grasping_ros sim.launch
    ```
+
+The platform setup follows the official ROBOTIS guide at
+https://emanual.robotis.com/docs/en/platform/turtlebot3/manipulation/.
 
 `~/.bashrc` is intentionally not modified; each terminal opts in by
 sourcing the workspace `setup.bash` once.

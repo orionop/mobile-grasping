@@ -128,6 +128,48 @@ TurtleBot 3 + OpenManipulator-X.
 
 **Next (Day 2 at IITB lab PC):**
 - Build the workspace, fix anything that breaks
-- Verify Gazebo spawns TB3 + OMX-X correctly
-- Verify all three nodes start and publish on expected topics
+- Verify Gazebo spawns TB3 + OMX-X correctly using the official
+  ROBOTIS launch first (`turtlebot3_manipulation_gazebo.launch`)
+- Then launch our composite `sim.launch` and verify our three
+  nodes start and publish on expected topics
 - Capture rostopic hz / rostopic echo output for the writeup
+
+---
+
+## 2026-06-03 — INSTALL alignment with official ROBOTIS docs
+
+**Goal:** Align the lab PC install with the official ROBOTIS
+TurtleBot3 + OpenManipulator-X documentation
+(https://emanual.robotis.com/docs/en/platform/turtlebot3/manipulation/),
+which is the canonical reference for this hardware stack.
+
+**Corrections made:**
+- Git branch for the ROBOTIS source clones: `noetic-devel` →
+  `noetic` (the actual branch name on ROBOTIS-GIT).
+- `TURTLEBOT3_MODEL` env variable: `waffle` → `waffle_pi`. Only the
+  Waffle Pi variant has the OpenCR/OpenManipulator-X integration;
+  using `waffle` would spawn the wrong robot.
+- Apt package list updated to match the ROBOTIS recommendation:
+  added `ros-noetic-ros-control*`, `ros-noetic-control*`,
+  `ros-noetic-moveit*`, `ros-noetic-dwa-local-planner` (umbrella
+  wildcards as the official docs use them).
+- `sim.launch`: include changed from the placeholder
+  `empty_world.launch` to the actual ROBOTIS launch
+  `turtlebot3_manipulation_gazebo.launch`.
+
+**Added a verification step in INSTALL.md:**
+- Step 7a runs the official ROBOTIS launch standalone
+  (`roslaunch turtlebot3_manipulation_gazebo turtlebot3_manipulation_gazebo.launch`)
+  before our composite `sim.launch`. This isolates "is the platform
+  set up correctly?" from "does our code launch correctly?", so
+  any issue is attributable to the right cause.
+
+**Files updated together (committed in one push):**
+- `ros_ws/INSTALL.md`: corrected commands and added the 7a step
+- `ros_ws/src/mobile_grasping_ros/launch/sim.launch`: corrected
+  include path and env default
+- `ros_ws/README.md`: lab PC quick start now references both the
+  ROBOTIS verification launch and our composite launch
+- `README.md`: top-level quick start mirrors the same two-step
+  launch sequence
+- `Docs/progress_log.md`: this entry

@@ -87,9 +87,17 @@ cd ~/Desktop/anurag_ws/mobile-grasping/ros_ws
 catkin_make
 source /opt/ros/noetic/setup.bash
 source devel/setup.bash
-export TURTLEBOT3_MODEL=waffle
+export TURTLEBOT3_MODEL=waffle_pi
+
+# Verify the platform install first (official ROBOTIS launch)
+roslaunch turtlebot3_manipulation_gazebo turtlebot3_manipulation_gazebo.launch
+
+# Then the full pipeline
 roslaunch mobile_grasping_ros sim.launch
 ```
+
+Platform setup follows the official ROBOTIS guide at
+https://emanual.robotis.com/docs/en/platform/turtlebot3/manipulation/.
 
 ## Progress writeup
 
