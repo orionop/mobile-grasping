@@ -138,6 +138,10 @@ class ControllerNode:
                 self.arm_cmd_topic, Float64MultiArray, queue_size=10
             )
 
+        # Diagnostics for live tracking (rqt_plot) and debugging.
+        self.ee_pose_pub = rospy.Publisher("/ee_pose", PoseStamped, queue_size=1)
+        self.ee_err_pub = rospy.Publisher("/ee_pos_error", Float64, queue_size=1)
+
         rospy.loginfo(
             "Controller node up: %d-DOF arm, %d-DOF base, %.0f Hz, "
             "cmd→%s (%s), use_base_J=%s",
@@ -263,6 +267,19 @@ class ControllerNode:
         T_target = _pose_to_T(self.target_pose.pose)
 
         v_desired = self._compute_desired_twist(T_ee, T_target)
+
+        # Live diagnostics: computed EE world pose + position error.
+        ee_ps = PoseStamped()
+        ee_ps.header.stamp = rospy.Time.now()
+        ee_ps.header.frame_id = "world"
+        ee_ps.pose.position.x = T_ee[0, 3]
+        ee_ps.pose.position.y = T_ee[1, 3]
+        ee_ps.pose.position.z = T_ee[2, 3]
+        self.ee_pose_pub.publish(ee_ps)
+        self.ee_err_pub.publish(
+            Float64(float(np.linalg.norm(T_target[:3, 3] - T_ee[:3, 3])))
+        )
+
         J_arm = omx.jacobian_world(q, T_base)          # (6, 4)
 
         if self.use_base_jacobian:
