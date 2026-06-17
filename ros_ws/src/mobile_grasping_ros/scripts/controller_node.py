@@ -85,7 +85,13 @@ class ControllerNode:
         self.use_base_jacobian = bool(rospy.get_param("~use_base_jacobian", False))
         # "trajectory" (position JointTrajectoryController) or "velocity".
         self.cmd_interface = rospy.get_param("~cmd_interface", "trajectory")
-        self.cmd_lookahead = float(rospy.get_param("~cmd_lookahead", 0.1))
+        self.cmd_lookahead = float(rospy.get_param("~cmd_lookahead", 0.08))
+        # Position JointTrajectoryControllers can't track goals restreamed at
+        # 200 Hz (each preempt resets the interpolation before it accelerates,
+        # giving jitter + near-zero net motion). Keep the QP at control_rate
+        # but throttle trajectory publishing to this rate.
+        self.traj_pub_rate = float(rospy.get_param("~traj_pub_rate", 25.0))
+        self._last_pub_t = 0.0
         self.arm_cmd_topic = rospy.get_param(
             "~arm_cmd_topic", "/arm_controller/command"
         )
@@ -142,7 +148,12 @@ class ControllerNode:
         self.base_pose = msg
 
     def _on_joint_state(self, msg):
-        self.joint_state = msg
+        # Gazebo publishes TWO /joint_states streams: the DiffDrive plugin
+        # (wheels only, high rate) and the arm joint_state_controller. Only
+        # keep messages that actually contain the arm joints, else the buffer
+        # is constantly clobbered by wheel-only frames -> stale q -> jitter.
+        if all(j in msg.name for j in ARM_JOINT_NAMES):
+            self.joint_state = msg
 
     # ------------------------------------------------------------------
     # Control loop
@@ -152,9 +163,18 @@ class ControllerNode:
         while not rospy.is_shutdown():
             if self._ready():
                 cmd = self._compute_command()
-                if cmd is not None:
+                if cmd is not None and self._should_publish():
                     self.cmd_pub.publish(cmd)
+                    self._last_pub_t = rospy.Time.now().to_sec()
             rate.sleep()
+
+    def _should_publish(self):
+        """Throttle trajectory streaming; velocity mode publishes every cycle."""
+        if self.cmd_interface != "trajectory":
+            return True
+        return (rospy.Time.now().to_sec() - self._last_pub_t) >= (
+            1.0 / self.traj_pub_rate
+        )
 
     def _ready(self):
         return all(x is not None for x in [
