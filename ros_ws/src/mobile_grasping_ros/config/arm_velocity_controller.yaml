@@ -1,0 +1,22 @@
+# arm_velocity_controller.yaml
+# Velocity-resolved arm controller. The Holistic QP outputs joint velocities
+# (q_dot); this controller commands them directly, matching the q_dot-cmd
+# architecture of Fig. 1. Replaces the stock position JointTrajectoryController,
+# which cannot track a moving setpoint (measured ~29 cm error tracking a
+# 0.05 m/s target).
+#
+# Requires the arm joints to expose a VelocityJointInterface. The stock
+# turtlebot3_manipulation transmission declares PositionJointInterface, so
+# open_manipulator_x.transmission.xacro must be switched to
+# VelocityJointInterface for joint1..joint4 (see ros_ws/INSTALL.md).
+#
+# Command topic: /arm_vel_controller/command  (std_msgs/Float64MultiArray)
+# Order matches the QP output: [joint1, joint2, joint3, joint4].
+
+arm_vel_controller:
+  type: velocity_controllers/JointGroupVelocityController
+  joints:
+    - joint1
+    - joint2
+    - joint3
+    - joint4

@@ -303,3 +303,38 @@ git clone -b noetic-devel https://github.com/ROBOTIS-GIT/turtlebot3_simulations.
 This route is recommended only if the lab explicitly disallows
 `sudo apt install`. For most lab PCs, the additive apt installs in
 step 2 are fine.
+
+---
+
+## Velocity interface for the arm (required for reactive control / M2)
+
+The Holistic QP outputs joint *velocities* (Fig. 1 q_dot-cmd). The stock
+`turtlebot3_manipulation` transmission declares a `PositionJointInterface`
+and loads a position `JointTrajectoryController`, which cannot track a
+moving setpoint (measured ~29 cm error following a 0.05 m/s target). Switch
+the four arm joints to a velocity interface:
+
+```bash
+# back up first
+cp ~/Desktop/anurag_ws/catkin_ws/src/turtlebot3_manipulation/turtlebot3_manipulation_description/urdf/open_manipulator_x.transmission.xacro{,.bak}
+
+# joint1..joint4 PositionJointInterface -> VelocityJointInterface
+# (gripper joints use EffortJointInterface and are left untouched)
+sed -i 's#PositionJointInterface#VelocityJointInterface#g' \
+  ~/Desktop/anurag_ws/catkin_ws/src/turtlebot3_manipulation/turtlebot3_manipulation_description/urdf/open_manipulator_x.transmission.xacro
+
+cd ~/Desktop/anurag_ws/catkin_ws && catkin_make
+```
+
+After this, the stock position `arm_controller` fails to load (expected -
+it cannot claim velocity-interface joints). `pipeline.launch` spawns our
+`arm_vel_controller` (velocity_controllers/JointGroupVelocityController,
+config in `config/arm_velocity_controller.yaml`) and `controller_node`
+publishes joint velocities to `/arm_vel_controller/command`.
+
+To revert to the stock position interface:
+```bash
+mv ~/Desktop/anurag_ws/catkin_ws/src/turtlebot3_manipulation/turtlebot3_manipulation_description/urdf/open_manipulator_x.transmission.xacro{.bak,}
+catkin_make
+# and launch with cmd_interface:=trajectory spawn_velocity_controller:=false
+```

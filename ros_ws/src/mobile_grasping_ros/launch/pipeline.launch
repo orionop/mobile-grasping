@@ -23,7 +23,15 @@
 
   <!-- M1: base stationary (J_base = 0). M2: set true for base-motion compensation. -->
   <arg name="use_base_jacobian" default="false"/>
-  <arg name="arm_cmd_topic" default="/arm_controller/command"/>
+
+  <!-- Arm command interface. "velocity" feeds QP joint velocities straight to
+       a JointGroupVelocityController (Fig. 1 q_dot-cmd architecture; requires
+       the VelocityJointInterface transmission, see INSTALL.md). "trajectory"
+       integrates to position and streams to the stock JointTrajectoryController
+       (laggy on moving setpoints; kept for fallback). -->
+  <arg name="cmd_interface" default="velocity"/>
+  <arg name="arm_cmd_topic" default="/arm_vel_controller/command"/>
+  <arg name="spawn_velocity_controller" default="true"/>
 
   <!-- Tracking-error logging for Exp 1 figure. Set eval:=true to record. -->
   <arg name="eval" default="false"/>
@@ -41,6 +49,17 @@
   <arg name="target_vy" default="0.0"/>
   <arg name="target_vz" default="0.0"/>
 
+  <!-- Velocity controller for the arm (q_dot-cmd interface). Loads its config
+       and spawns it via controller_manager. The stock position arm_controller
+       cannot claim VelocityJointInterface joints, so it simply fails to start
+       once the transmission is switched; that is expected. -->
+  <group if="$(arg spawn_velocity_controller)">
+    <rosparam command="load"
+              file="$(find mobile_grasping_ros)/config/arm_velocity_controller.yaml"/>
+    <node name="arm_vel_controller_spawner" pkg="controller_manager"
+          type="spawner" output="screen" args="arm_vel_controller"/>
+  </group>
+
   <!-- Controller -->
   <node pkg="mobile_grasping_ros" type="controller_node.py"
         name="mobile_grasping_controller" output="screen">
@@ -48,6 +67,7 @@
               file="$(find mobile_grasping_ros)/config/controller_params.yaml"/>
     <param name="control_rate_hz" value="$(arg control_rate_hz)"/>
     <param name="use_base_jacobian" value="$(arg use_base_jacobian)"/>
+    <param name="cmd_interface" value="$(arg cmd_interface)"/>
     <param name="arm_cmd_topic" value="$(arg arm_cmd_topic)"/>
   </node>
 

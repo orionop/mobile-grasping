@@ -28,6 +28,8 @@
   <arg name="eval" default="false"/>
   <arg name="eval_csv" default="/tmp/tracking_error.csv"/>
   <arg name="use_base_jacobian" default="false"/>
+  <arg name="cmd_interface" default="velocity"/>
+  <arg name="spawn_velocity_controller" default="true"/>
   <arg name="target_x" default="0.25"/>
   <arg name="target_y" default="0.0"/>
   <arg name="target_z" default="0.20"/>
@@ -49,6 +51,8 @@
     <arg name="eval" value="$(arg eval)"/>
     <arg name="eval_csv" value="$(arg eval_csv)"/>
     <arg name="use_base_jacobian" value="$(arg use_base_jacobian)"/>
+    <arg name="cmd_interface" value="$(arg cmd_interface)"/>
+    <arg name="spawn_velocity_controller" value="$(arg spawn_velocity_controller)"/>
     <arg name="target_x" value="$(arg target_x)"/>
     <arg name="target_y" value="$(arg target_y)"/>
     <arg name="target_z" value="$(arg target_z)"/>
