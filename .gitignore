@@ -137,3 +137,4 @@ datasets/
 .cache/
 *.bak
 swift_venv/
+swift_sim/omx_tb3.urdf
