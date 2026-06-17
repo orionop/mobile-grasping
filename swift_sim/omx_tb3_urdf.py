@@ -56,7 +56,7 @@ def _urdf_string():
     <visual>
       <origin xyz="-0.064 0 0.010" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="file://{_mesh('waffle_pi_base.stl')}" scale="0.001 0.001 0.001"/>
+        <mesh filename="{_mesh('waffle_pi_base.stl')}" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="dark"><color rgba="0.2 0.2 0.2 1"/></material>
     </visual>
@@ -75,7 +75,7 @@ def _urdf_string():
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="file://{_mesh('chain_link1.stl')}" scale="0.001 0.001 0.001"/>
+        <mesh filename="{_mesh('chain_link1.stl')}" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="omx"><color rgba="0.1 0.1 0.1 1"/></material>
     </visual>
@@ -91,7 +91,7 @@ def _urdf_string():
     <visual>
       <origin xyz="0 0 0.018" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="file://{_mesh('chain_link2.stl')}" scale="0.001 0.001 0.001"/>
+        <mesh filename="{_mesh('chain_link2.stl')}" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="omx"><color rgba="0.1 0.1 0.1 1"/></material>
     </visual>
@@ -107,7 +107,7 @@ def _urdf_string():
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="file://{_mesh('chain_link3.stl')}" scale="0.001 0.001 0.001"/>
+        <mesh filename="{_mesh('chain_link3.stl')}" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="omx"><color rgba="0.1 0.1 0.1 1"/></material>
     </visual>
@@ -123,7 +123,7 @@ def _urdf_string():
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="file://{_mesh('chain_link4.stl')}" scale="0.001 0.001 0.001"/>
+        <mesh filename="{_mesh('chain_link4.stl')}" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="omx"><color rgba="0.1 0.1 0.1 1"/></material>
     </visual>
@@ -139,7 +139,7 @@ def _urdf_string():
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="file://{_mesh('chain_link5.stl')}" scale="0.001 0.001 0.001"/>
+        <mesh filename="{_mesh('chain_link5.stl')}" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="omx"><color rgba="0.1 0.1 0.1 1"/></material>
     </visual>
