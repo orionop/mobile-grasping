@@ -29,7 +29,8 @@ from run_m2 import solve_arm_qd, feasible_grasp_pose, pose_error
 N_BASE = 2
 
 
-def view(mode, v_base=0.10, drive_dist=0.08, settle=3.0, dt=0.02):
+def view(mode, v_base=0.10, drive_dist=0.08, settle=3.0, dt=0.02,
+         continuous=False, drive_time=6.0):
     robot = make_omx_tb3_mesh()          # real-mesh robot, ETS-identical kinematics
     robot.q = robot.qr
 
@@ -37,14 +38,11 @@ def view(mode, v_base=0.10, drive_dist=0.08, settle=3.0, dt=0.02):
     env.launch(realtime=True)
     env.add(robot)                       # renders the OMX-X + TB3 meshes
 
-    # Clean on-the-move visual:
-    #  - target ELEVATED (z=0.20, above the ~0.14 m Waffle base) so the base
-    #    body never intersects the grasp marker as it rolls underneath;
-    #  - EE stays ahead of the base centre the whole pass, so the arm is always
-    #    reaching FORWARD-up (extended) and never folds into its own base;
-    #  - base rolls 0.18 m, full pose held 100% within 1 cm & 5 deg (max 0.2 cm).
-    # Visualisation config; the M1/M2 quantitative figures are unchanged.
-    Tep = feasible_grasp_pose([0.12, 0.0, 0.20])
+    # Grasp target fixed in the WORLD frame (elevated above the base so the base
+    # body clears it). Continuous mode places it a little further ahead so the
+    # base drives up to and past it during the free run.
+    tx = 0.20 if continuous else 0.12
+    Tep = feasible_grasp_pose([tx, 0.0, 0.20])
     env.add(sg.Sphere(0.02, pose=Tep, color=[0.2, 0.8, 0.2, 0.8]))
 
     feedback = (mode != "m2-open")
@@ -52,7 +50,16 @@ def view(mode, v_base=0.10, drive_dist=0.08, settle=3.0, dt=0.02):
     q_latched = None
     t = 0.0
     dist = 0.0
-    while t < settle or (moving and dist < drive_dist):
+    hold_dist = 0.0     # base travel held within 1 cm & 5 deg
+
+    def keep_going():
+        if mode == "m1":
+            return t < settle
+        if continuous:
+            return t < settle + drive_time      # base drives freely the whole time
+        return t < settle or dist < drive_dist  # fixed-distance pass
+
+    while keep_going():
         driving = moving and t >= settle
         if driving:
             robot.q[1] += v_base * dt
@@ -72,11 +79,15 @@ def view(mode, v_base=0.10, drive_dist=0.08, settle=3.0, dt=0.02):
         robot.q[N_BASE:] = robot.q[N_BASE:] + qd[N_BASE:] * dt
         env.step(dt)
 
-        if mode == "m1" and t >= settle:
-            break
+        if driving:
+            pe, oe = pose_error(robot.fkine(robot.q), Tep)
+            if pe < 0.01 and oe < 5.0:
+                hold_dist = dist
         t += dt
 
     pe, oe = pose_error(robot.fkine(robot.q), Tep)
+    print(f"[{mode}] base travelled {dist*100:.1f} cm; held the fixed pose "
+          f"within 1cm&5deg over {hold_dist*100:.1f} cm of travel.")
     print(f"[{mode}] final pose error: {pe*100:.2f} cm, {oe:.2f} deg")
     print("Swift viewer holding. Ctrl-C to exit.")
     env.hold()
@@ -88,6 +99,9 @@ if __name__ == "__main__":
     g.add_argument("--m1", action="store_true")
     g.add_argument("--m2-closed", action="store_true")
     g.add_argument("--m2-open", action="store_true")
+    ap.add_argument("--continuous", action="store_true",
+                    help="base drives freely at v (no fixed stop distance); "
+                         "the arm holds the fixed world dot until it leaves reach")
     args = ap.parse_args()
     mode = "m1" if args.m1 else ("m2-closed" if args.m2_closed else "m2-open")
-    view(mode)
+    view(mode, continuous=args.continuous)
