@@ -29,6 +29,13 @@
   <arg name="eval" default="false"/>
   <arg name="eval_csv" default="/tmp/tracking_error.csv"/>
 
+  <!-- Fixed grasp target (world frame). Default kept inside the OMX-X
+       reach (~0.38 m from arm base); 0.5 m was unreachable and saturated
+       the QP. Override with target_x:=... etc. -->
+  <arg name="target_x" default="0.25"/>
+  <arg name="target_y" default="0.0"/>
+  <arg name="target_z" default="0.20"/>
+
   <!-- Controller -->
   <node pkg="mobile_grasping_ros" type="controller_node.py"
         name="mobile_grasping_controller" output="screen">
@@ -52,9 +59,9 @@
   <node pkg="mobile_grasping_ros" type="predictor_node.py"
         name="mobile_grasping_predictor" output="screen">
     <param name="publish_rate_hz" value="$(arg predictor_rate_hz)"/>
-    <param name="x" value="0.5"/>
-    <param name="y" value="0.0"/>
-    <param name="z" value="0.1"/>
+    <param name="x" value="$(arg target_x)"/>
+    <param name="y" value="$(arg target_y)"/>
+    <param name="z" value="$(arg target_z)"/>
     <param name="frame_id" value="world"/>
   </node>
 
