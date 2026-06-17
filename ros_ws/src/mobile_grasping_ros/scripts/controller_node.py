@@ -44,7 +44,7 @@ Parameters (from controller_params.yaml + inline)
 import numpy as np
 import rospy
 
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, Twist
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Float64, Float64MultiArray
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
@@ -127,6 +127,10 @@ class ControllerNode:
         rospy.Subscriber("/grasp_pose", PoseStamped, self._on_grasp_pose)
         rospy.Subscriber("/base_pose", PoseStamped, self._on_base_pose)
         rospy.Subscriber("/joint_states", JointState, self._on_joint_state)
+        # Commanded base velocity (M2 feedforward): the arm cancels the known
+        # base twist instead of only reacting to the resulting pose error.
+        rospy.Subscriber("/cmd_vel", Twist, self._on_cmd_vel)
+        self.cmd_vel = np.zeros(2)   # [v_forward, omega]
 
         # Publisher (message type depends on cmd_interface)
         if self.cmd_interface == "trajectory":
@@ -157,6 +161,9 @@ class ControllerNode:
 
     def _on_base_pose(self, msg):
         self.base_pose = msg
+
+    def _on_cmd_vel(self, msg):
+        self.cmd_vel = np.array([msg.linear.x, msg.angular.z])
 
     def _on_joint_state(self, msg):
         # Gazebo publishes TWO /joint_states streams: the DiffDrive plugin
@@ -283,16 +290,19 @@ class ControllerNode:
         J_arm = omx.jacobian_world(q, T_base)          # (6, 4)
 
         if self.use_base_jacobian:
-            # M2: account for base motion in the Holistic Jacobian
+            # M2: feed-forward the KNOWN base twist. The base is driven
+            # externally at the commanded /cmd_vel; the arm must cancel the
+            # EE motion that base velocity induces, on top of the reactive
+            # pose-error servo. Subtract J_base @ u_base from the desired EE
+            # twist so the arm-only solve produces the compensating motion.
             theta_b = _yaw_from_T(T_base)
-            p_base = T_base[:3, 3]
-            p_ee = T_ee[:3, 3]
-            J_base = omx.base_jacobian_world(theta_b, p_base, p_ee)  # (6, 2)
-        else:
-            # M1: base stationary, no base contribution
-            J_base = np.zeros((6, self.cfg.n_base))
+            J_base = omx.base_jacobian_world(theta_b, T_base[:3, 3], T_ee[:3, 3])
+            v_desired = v_desired - J_base @ self.cmd_vel
 
-        _, qdot_arm, slack = self.solver.solve(J_arm, J_base, v_desired)
+        # Base velocity is an external input, not a QP decision variable, so
+        # the solver always sees an arm-only Jacobian (zero base columns).
+        J_base_qp = np.zeros((6, self.cfg.n_base))
+        _, qdot_arm, slack = self.solver.solve(J_arm, J_base_qp, v_desired)
 
         rospy.logdebug(
             "EE err pos=%.4f m  |slack|=%.2e",
