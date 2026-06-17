@@ -1,0 +1,86 @@
+<?xml version="1.0"?>
+<!--
+  sim_velocity.launch
+  ===================
+
+  Velocity-control Gazebo bring-up for the q_dot-cmd architecture (Fig. 1).
+
+  Replicates turtlebot3_manipulation_gazebo.launch but deliberately OMITS:
+    - gazebo_controller.yaml  (the position/velocity PID gains). Without
+      pid_gains, gazebo_ros_control drives the VelocityJointInterface joints
+      with a direct, near-ideal velocity servo (SetVelocity) instead of a
+      PID-to-effort loop that saturates the 1 N*m joint effort limit and lets
+      the arm sag. This matches the velocity-resolved kinematic model the
+      Holistic QP assumes; actuator dynamics are evaluated on hardware (Phase 2).
+    - turtlebot3_manipulation_controller.launch (the position arm_controller).
+
+  Loads instead: joint_state_controller (via controller_utils) + our
+  arm_vel_controller (spawned by pipeline.launch), and our pipeline nodes.
+
+  Requires the transmission switched to VelocityJointInterface for joint1..4
+  (see ros_ws/INSTALL.md).
+
+  Usage mirrors sim.launch:
+    roslaunch mobile_grasping_ros sim_velocity.launch gui:=true \
+        eval:=true eval_csv:=/tmp/m2.csv use_base_jacobian:=true
+-->
+<launch>
+
+  <arg name="model" default="waffle_pi"/>
+  <arg name="gui" default="true"/>
+  <arg name="paused" default="false"/>
+  <arg name="use_sim_time" default="true"/>
+
+  <!-- Pipeline args (forwarded to pipeline.launch). -->
+  <arg name="eval" default="false"/>
+  <arg name="eval_csv" default="/tmp/tracking_error.csv"/>
+  <arg name="use_base_jacobian" default="false"/>
+  <arg name="target_x" default="0.25"/>
+  <arg name="target_y" default="0.0"/>
+  <arg name="target_z" default="0.20"/>
+  <arg name="target_vx" default="0.0"/>
+  <arg name="target_vy" default="0.0"/>
+  <arg name="target_vz" default="0.0"/>
+
+  <env name="TURTLEBOT3_MODEL" value="$(arg model)"/>
+
+  <!-- NOTE: gazebo_controller.yaml (pid_gains) intentionally NOT loaded. -->
+
+  <!-- Gazebo world -->
+  <include file="$(find gazebo_ros)/launch/empty_world.launch">
+    <arg name="paused" value="$(arg paused)"/>
+    <arg name="gui" value="$(arg gui)"/>
+    <arg name="use_sim_time" value="$(arg use_sim_time)"/>
+  </include>
+
+  <!-- robot_description -->
+  <include file="$(find turtlebot3_manipulation_description)/launch/turtlebot3_manipulation_upload.launch">
+    <arg name="model" value="$(arg model)"/>
+  </include>
+
+  <!-- spawn the robot at home config -->
+  <node name="spawn_gazebo_model" pkg="gazebo_ros" type="spawn_model"
+        respawn="false" output="screen"
+        args="-urdf -param robot_description -model robot -x 0.0 -y 0.0 -Y 0.0
+              -J joint1 0.0 -J joint2 0.0 -J joint3 0.0 -J joint4 0.0
+              -J gripper 0.0 -J gripper_sub 0.0"/>
+
+  <!-- joint_state_controller (robot_state_publisher + joint states) -->
+  <include file="$(find turtlebot3_manipulation_gazebo)/launch/controller_utils.launch"/>
+
+  <!-- our pipeline: spawns arm_vel_controller + controller/predictor/estimator -->
+  <include file="$(find mobile_grasping_ros)/launch/pipeline.launch">
+    <arg name="cmd_interface" value="velocity"/>
+    <arg name="spawn_velocity_controller" value="true"/>
+    <arg name="eval" value="$(arg eval)"/>
+    <arg name="eval_csv" value="$(arg eval_csv)"/>
+    <arg name="use_base_jacobian" value="$(arg use_base_jacobian)"/>
+    <arg name="target_x" value="$(arg target_x)"/>
+    <arg name="target_y" value="$(arg target_y)"/>
+    <arg name="target_z" value="$(arg target_z)"/>
+    <arg name="target_vx" value="$(arg target_vx)"/>
+    <arg name="target_vy" value="$(arg target_vy)"/>
+    <arg name="target_vz" value="$(arg target_vz)"/>
+  </include>
+
+</launch>
