@@ -76,23 +76,25 @@ class ControllerNode:
     def __init__(self):
         rospy.init_node("mobile_grasping_controller", anonymous=False)
 
-        # Parameters
-        self.control_rate = rospy.get_param("~control_rate_hz", 200.0)
-        self.servoing_gain = rospy.get_param("~servoing_gain", 1.0)
+        # Parameters. Coerce numeric types explicitly: PyYAML resolves
+        # unsigned-exponent floats like "1.0e6" as strings, so rosparam can
+        # hand back str for slack_penalty etc. float()/int() makes it robust.
+        self.control_rate = float(rospy.get_param("~control_rate_hz", 200.0))
+        self.servoing_gain = float(rospy.get_param("~servoing_gain", 1.0))
         # M1: False (J_base = 0).  M2: True (real diff-drive J_base).
-        self.use_base_jacobian = rospy.get_param("~use_base_jacobian", False)
+        self.use_base_jacobian = bool(rospy.get_param("~use_base_jacobian", False))
         # "trajectory" (position JointTrajectoryController) or "velocity".
         self.cmd_interface = rospy.get_param("~cmd_interface", "trajectory")
-        self.cmd_lookahead = rospy.get_param("~cmd_lookahead", 0.1)
+        self.cmd_lookahead = float(rospy.get_param("~cmd_lookahead", 0.1))
         self.arm_cmd_topic = rospy.get_param(
             "~arm_cmd_topic", "/arm_controller/command"
         )
 
-        n_arm = rospy.get_param("~n_arm", 4)
-        n_base = rospy.get_param("~n_base", 2)
-        v_max_arm = rospy.get_param("~v_max_arm", 1.5)
-        v_max_base = rospy.get_param("~v_max_base", 0.26)
-        slack_penalty = rospy.get_param("~slack_penalty", 1.0e6)
+        n_arm = int(rospy.get_param("~n_arm", 4))
+        n_base = int(rospy.get_param("~n_base", 2))
+        v_max_arm = float(rospy.get_param("~v_max_arm", 1.5))
+        v_max_base = float(rospy.get_param("~v_max_base", 0.26))
+        slack_penalty = float(rospy.get_param("~slack_penalty", 1.0e6))
 
         self.cfg = HolisticQPConfig(
             n_arm=n_arm,

@@ -14,4 +14,5 @@ v_max_arm: 1.5   # rad/s (per joint)
 v_max_base: 0.26 # m/s (TB3 Waffle max linear)
 
 # QP slack penalty (higher = tighter tracking, less constraint flexibility)
-slack_penalty: 1.0e6
+# Signed exponent required: PyYAML parses "1.0e6" as a string, "1.0e+6" as float.
+slack_penalty: 1.0e+6
