@@ -1,0 +1,93 @@
+<?xml version="1.0"?>
+<!--
+  sim_position.launch
+  ===================
+
+  DEFAULT M1/M2 bring-up. Reactive position-stream servoing (MoveIt-Servo
+  pattern): the QP joint velocities are integrated to a position setpoint and
+  streamed to a JointGroupPositionController on the stock PositionJointInterface.
+  Gazebo's position PID drives joint velocity to reach each setpoint, so the arm
+  holds against gravity AND tracks a moving setpoint without the
+  JointTrajectoryController's re-planning lag.
+
+  Replicates turtlebot3_manipulation_gazebo.launch but replaces
+  turtlebot3_manipulation_controller.launch (which spawns the position
+  JointTrajectoryController arm_controller) with our pipeline, which spawns
+  arm_pos_controller. KEEPS gazebo_controller.yaml (pid_gains) -- the position
+  interface needs those gains to drive the joints. No URDF/transmission edits.
+
+  Usage:
+    # closed-loop M2:
+    roslaunch mobile_grasping_ros sim_position.launch gui:=true \
+        use_base_jacobian:=true eval:=true eval_csv:=/tmp/m2_closed.csv
+    # open-loop baseline:
+    roslaunch mobile_grasping_ros sim_position.launch gui:=true \
+        feedback_enabled:=false eval:=true eval_csv:=/tmp/m2_open.csv
+-->
+<launch>
+
+  <arg name="model" default="waffle_pi"/>
+  <arg name="gui" default="true"/>
+  <arg name="paused" default="false"/>
+  <arg name="use_sim_time" default="true"/>
+
+  <!-- Pipeline args (forwarded to pipeline.launch). -->
+  <arg name="eval" default="false"/>
+  <arg name="eval_csv" default="/tmp/tracking_error.csv"/>
+  <arg name="use_base_jacobian" default="false"/>
+  <arg name="feedback_enabled" default="true"/>
+  <arg name="target_x" default="0.25"/>
+  <arg name="target_y" default="0.0"/>
+  <arg name="target_z" default="0.20"/>
+  <arg name="target_vx" default="0.0"/>
+  <arg name="target_vy" default="0.0"/>
+  <arg name="target_vz" default="0.0"/>
+
+  <env name="TURTLEBOT3_MODEL" value="$(arg model)"/>
+
+  <!-- Gazebo position PID gains (needed by the PositionJointInterface). -->
+  <rosparam file="$(find turtlebot3_manipulation_gazebo)/config/gazebo_controller.yaml"
+            command="load"/>
+
+  <!-- Gazebo world -->
+  <include file="$(find gazebo_ros)/launch/empty_world.launch">
+    <arg name="paused" value="$(arg paused)"/>
+    <arg name="gui" value="$(arg gui)"/>
+    <arg name="use_sim_time" value="$(arg use_sim_time)"/>
+  </include>
+
+  <!-- robot_description -->
+  <include file="$(find turtlebot3_manipulation_description)/launch/turtlebot3_manipulation_upload.launch">
+    <arg name="model" value="$(arg model)"/>
+  </include>
+
+  <!-- spawn the robot at home config -->
+  <node name="spawn_gazebo_model" pkg="gazebo_ros" type="spawn_model"
+        respawn="false" output="screen"
+        args="-urdf -param robot_description -model robot -x 0.0 -y 0.0 -Y 0.0
+              -J joint1 0.0 -J joint2 0.0 -J joint3 0.0 -J joint4 0.0
+              -J gripper 0.0 -J gripper_sub 0.0"/>
+
+  <!-- joint_state_controller -->
+  <include file="$(find turtlebot3_manipulation_gazebo)/launch/controller_utils.launch"/>
+
+  <!-- our pipeline: spawns arm_pos_controller + controller/predictor/estimator.
+       NOTE: turtlebot3_manipulation_controller.launch (stock arm_controller) is
+       deliberately NOT included -- it would claim the same joints. -->
+  <include file="$(find mobile_grasping_ros)/launch/pipeline.launch">
+    <arg name="cmd_interface" value="position"/>
+    <arg name="spawn_position_controller" value="true"/>
+    <arg name="spawn_velocity_controller" value="false"/>
+    <arg name="eval" value="$(arg eval)"/>
+    <arg name="eval_csv" value="$(arg eval_csv)"/>
+    <arg name="use_base_jacobian" value="$(arg use_base_jacobian)"/>
+    <arg name="feedback_enabled" value="$(arg feedback_enabled)"/>
+    <arg name="target_x" value="$(arg target_x)"/>
+    <arg name="target_y" value="$(arg target_y)"/>
+    <arg name="target_z" value="$(arg target_z)"/>
+    <arg name="target_vx" value="$(arg target_vx)"/>
+    <arg name="target_vy" value="$(arg target_vy)"/>
+    <arg name="target_vz" value="$(arg target_vz)"/>
+  </include>
+
+</launch>

@@ -24,14 +24,22 @@
   <!-- M1: base stationary (J_base = 0). M2: set true for base-motion compensation. -->
   <arg name="use_base_jacobian" default="false"/>
 
-  <!-- Arm command interface. "velocity" feeds QP joint velocities straight to
-       a JointGroupVelocityController (Fig. 1 q_dot-cmd architecture; requires
-       the VelocityJointInterface transmission, see INSTALL.md). "trajectory"
-       integrates to position and streams to the stock JointTrajectoryController
-       (laggy on moving setpoints; kept for fallback). -->
-  <arg name="cmd_interface" default="velocity"/>
-  <arg name="arm_cmd_topic" default="/arm_vel_controller/command"/>
-  <arg name="spawn_velocity_controller" default="true"/>
+  <!-- Closed-loop (true) vs open-loop baseline (false: arm runs blind on the
+       base pose latched at t=0). Exp 1 compares these. -->
+  <arg name="feedback_enabled" default="true"/>
+
+  <!-- Arm command interface (default "position"):
+       "position"   -> integrate q_dot to a position setpoint, stream to a
+                       JointGroupPositionController (MoveIt-Servo pattern; holds
+                       against gravity AND tracks a moving setpoint). DEFAULT.
+       "velocity"   -> q_dot straight to a JointGroupVelocityController (needs
+                       the VelocityJointInterface transmission; sags in Gazebo).
+       "trajectory" -> one-point JointTrajectory to the stock
+                       JointTrajectoryController (laggy on moving setpoints). -->
+  <arg name="cmd_interface" default="position"/>
+  <arg name="arm_cmd_topic" default="/arm_pos_controller/command"/>
+  <arg name="spawn_position_controller" default="true"/>
+  <arg name="spawn_velocity_controller" default="false"/>
 
   <!-- Tracking-error logging for Exp 1 figure. Set eval:=true to record. -->
   <arg name="eval" default="false"/>
@@ -49,10 +57,19 @@
   <arg name="target_vy" default="0.0"/>
   <arg name="target_vz" default="0.0"/>
 
-  <!-- Velocity controller for the arm (q_dot-cmd interface). Loads its config
-       and spawns it via controller_manager. The stock position arm_controller
-       cannot claim VelocityJointInterface joints, so it simply fails to start
-       once the transmission is switched; that is expected. -->
+  <!-- Position group controller (default reactive-servo interface). Replaces
+       the stock arm_controller; uses the same PositionJointInterface. The
+       bring-up launch must NOT also spawn the stock arm_controller (they claim
+       the same joints) -- see sim_position.launch. -->
+  <group if="$(arg spawn_position_controller)">
+    <rosparam command="load"
+              file="$(find mobile_grasping_ros)/config/arm_position_controller.yaml"/>
+    <node name="arm_pos_controller_spawner" pkg="controller_manager"
+          type="spawner" output="screen" args="arm_pos_controller"/>
+  </group>
+
+  <!-- Velocity controller (deprecated; needs VelocityJointInterface, sags in
+       Gazebo). Off by default. -->
   <group if="$(arg spawn_velocity_controller)">
     <rosparam command="load"
               file="$(find mobile_grasping_ros)/config/arm_velocity_controller.yaml"/>
@@ -67,6 +84,7 @@
               file="$(find mobile_grasping_ros)/config/controller_params.yaml"/>
     <param name="control_rate_hz" value="$(arg control_rate_hz)"/>
     <param name="use_base_jacobian" value="$(arg use_base_jacobian)"/>
+    <param name="feedback_enabled" value="$(arg feedback_enabled)"/>
     <param name="cmd_interface" value="$(arg cmd_interface)"/>
     <param name="arm_cmd_topic" value="$(arg arm_cmd_topic)"/>
   </node>

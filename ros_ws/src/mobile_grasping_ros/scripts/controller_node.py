@@ -80,22 +80,33 @@ class ControllerNode:
         # unsigned-exponent floats like "1.0e6" as strings, so rosparam can
         # hand back str for slack_penalty etc. float()/int() makes it robust.
         self.control_rate = float(rospy.get_param("~control_rate_hz", 200.0))
-        # Higher gain tightens reactive correction (M1 converged fine at 0.5;
-        # M2 needs faster correction of base-induced drift).
-        self.servoing_gain = float(rospy.get_param("~servoing_gain", 1.5))
-        # M1: False (J_base = 0).  M2: True (real diff-drive J_base).
+        # Reactive servo gain. M1 (static) converged at 0.5; M2 (base-induced
+        # drift) needs faster correction. 1.0 is a stable middle ground.
+        self.servoing_gain = float(rospy.get_param("~servoing_gain", 1.0))
+        # M1: False (J_base = 0).  M2: True (diff-drive feedforward).
         self.use_base_jacobian = bool(rospy.get_param("~use_base_jacobian", False))
-        # "trajectory" (position JointTrajectoryController) or "velocity".
-        self.cmd_interface = rospy.get_param("~cmd_interface", "trajectory")
+        # Closed-loop (True) uses the live base pose. Open-loop baseline (False)
+        # latches the base pose at t=0 and runs the arm blind -- the faithful
+        # Kiyokawa open-loop failure mode (stale base pose in the Jacobian).
+        self.feedback_enabled = bool(rospy.get_param("~feedback_enabled", True))
+        self._T_base0 = None   # latched base pose for the open-loop baseline
+        # Arm command interface:
+        #   "position"   -> Float64MultiArray of joint positions to a
+        #                   JointGroupPositionController (MoveIt-Servo pattern;
+        #                   holds against gravity AND tracks a streamed setpoint
+        #                   without trajectory-replanning lag). DEFAULT.
+        #   "velocity"   -> Float64MultiArray of joint velocities (needs a
+        #                   VelocityJointInterface; sags in Gazebo, deprecated).
+        #   "trajectory" -> one-point JointTrajectory to a
+        #                   JointTrajectoryController (laggy on moving setpoints).
+        self.cmd_interface = rospy.get_param("~cmd_interface", "position")
         self.cmd_lookahead = float(rospy.get_param("~cmd_lookahead", 0.05))
-        # Position JointTrajectoryControllers can't track goals restreamed at
-        # 200 Hz (each preempt resets the interpolation before it accelerates,
-        # giving jitter + near-zero net motion). Keep the QP at control_rate
-        # but throttle trajectory publishing to this rate.
-        self.traj_pub_rate = float(rospy.get_param("~traj_pub_rate", 50.0))
+        # Publish rate for streamed setpoints (position/trajectory modes). The
+        # QP still runs at control_rate; this throttles the stream.
+        self.traj_pub_rate = float(rospy.get_param("~traj_pub_rate", 100.0))
         self._last_pub_t = 0.0
         self.arm_cmd_topic = rospy.get_param(
-            "~arm_cmd_topic", "/arm_controller/command"
+            "~arm_cmd_topic", "/arm_pos_controller/command"
         )
 
         n_arm = int(rospy.get_param("~n_arm", 4))
@@ -134,7 +145,9 @@ class ControllerNode:
         rospy.Subscriber("/cmd_vel", Twist, self._on_cmd_vel)
         self.cmd_vel = np.zeros(2)   # [v_forward, omega]
 
-        # Publisher (message type depends on cmd_interface)
+        # Publisher (message type depends on cmd_interface). "position" and
+        # "velocity" both stream Float64MultiArray; only "trajectory" uses
+        # JointTrajectory.
         if self.cmd_interface == "trajectory":
             self.cmd_pub = rospy.Publisher(
                 self.arm_cmd_topic, JointTrajectory, queue_size=1
@@ -150,9 +163,10 @@ class ControllerNode:
 
         rospy.loginfo(
             "Controller node up: %d-DOF arm, %d-DOF base, %.0f Hz, "
-            "cmd→%s (%s), use_base_J=%s",
+            "cmd→%s (%s), use_base_J=%s, feedback=%s",
             n_arm, n_base, self.control_rate,
             self.arm_cmd_topic, self.cmd_interface, self.use_base_jacobian,
+            self.feedback_enabled,
         )
 
     # ------------------------------------------------------------------
@@ -243,26 +257,35 @@ class ControllerNode:
         return self.servoing_gain * np.concatenate([delta_p, delta_r])
 
     def _build_msg(self, qdot_arm: np.ndarray, q: np.ndarray):
-        """Pack QP velocity output into the configured message type."""
+        """Pack the QP velocity output into the configured message type."""
+        # Integrated position setpoint, re-seeded from measured q each cycle so
+        # tracking error from the underlying controller self-corrects (no
+        # windup). Shared by the position and trajectory interfaces.
+        q_cmd = q + qdot_arm * self.cmd_lookahead
+
+        if self.cmd_interface == "position":
+            # MoveIt-Servo pattern: raw position stream to a
+            # JointGroupPositionController. Gazebo's position interface drives
+            # joint velocity to reach each setpoint -> holds against gravity and
+            # tracks the stream without trajectory-replanning lag.
+            msg = Float64MultiArray()
+            msg.data = q_cmd.tolist()
+            return msg
+
         if self.cmd_interface == "trajectory":
-            # Integrate velocity to a position setpoint and stream a
-            # single-point JointTrajectory for the position controller.
-            q_cmd = q + qdot_arm * self.cmd_lookahead
+            # One-point JointTrajectory for a JointTrajectoryController. Laggy
+            # on moving setpoints (re-plans each goal); kept as fallback.
             traj = JointTrajectory()
             traj.header.stamp = rospy.Time.now()
             traj.joint_names = ARM_JOINT_NAMES
             pt = JointTrajectoryPoint()
             pt.positions = q_cmd.tolist()
-            # Velocity endpoint: lets the position controller SUSTAIN the
-            # commanded joint velocity between streamed waypoints instead of
-            # decelerating to rest each cycle. Essential for M2, where the arm
-            # must hold a continuous EE velocity to cancel base motion. Safe
-            # now that task-space relaxation keeps qdot smooth (the earlier
-            # jitter came from saturated, sign-flipping qdot pre-relaxation).
             pt.velocities = qdot_arm.tolist()
             pt.time_from_start = rospy.Duration(self.cmd_lookahead)
             traj.points = [pt]
             return traj
+
+        # "velocity": raw joint velocities (needs a VelocityJointInterface).
         msg = Float64MultiArray()
         msg.data = qdot_arm.tolist()
         return msg
@@ -275,32 +298,42 @@ class ControllerNode:
         if q is None:
             return None   # don't command a setpoint we can't anchor to current q
 
-        T_base = _pose_to_T(self.base_pose.pose)
-        T_ee = omx.fk_world(q, T_base)
+        # Closed-loop uses the live base pose. Open-loop baseline latches the
+        # pose at the first solve and reuses it -- the arm then runs blind on a
+        # stale base pose while the base physically moves (faithful Kiyokawa
+        # open-loop failure mode). The arm's joint state q is always live.
+        T_base_live = _pose_to_T(self.base_pose.pose)
+        if self._T_base0 is None:
+            self._T_base0 = T_base_live
+        T_base = T_base_live if self.feedback_enabled else self._T_base0
+
+        T_ee = omx.fk_world(q, T_base)             # control frame (may be stale)
+        T_ee_real = omx.fk_world(q, T_base_live)   # true EE, for diagnostics
         T_target = _pose_to_T(self.target_pose.pose)
 
         v_desired = self._compute_desired_twist(T_ee, T_target)
 
-        # Live diagnostics: computed EE world pose + position error.
+        # Diagnostics report the TRUE EE error (live base pose), so /ee_pos_error
+        # reflects reality even in open-loop where control runs on a stale pose.
         ee_ps = PoseStamped()
         ee_ps.header.stamp = rospy.Time.now()
         ee_ps.header.frame_id = "world"
-        ee_ps.pose.position.x = T_ee[0, 3]
-        ee_ps.pose.position.y = T_ee[1, 3]
-        ee_ps.pose.position.z = T_ee[2, 3]
+        ee_ps.pose.position.x = T_ee_real[0, 3]
+        ee_ps.pose.position.y = T_ee_real[1, 3]
+        ee_ps.pose.position.z = T_ee_real[2, 3]
         self.ee_pose_pub.publish(ee_ps)
         self.ee_err_pub.publish(
-            Float64(float(np.linalg.norm(T_target[:3, 3] - T_ee[:3, 3])))
+            Float64(float(np.linalg.norm(T_target[:3, 3] - T_ee_real[:3, 3])))
         )
 
         J_arm = omx.jacobian_world(q, T_base)          # (6, 4)
 
-        if self.use_base_jacobian:
-            # M2: feed-forward the KNOWN base twist. The base is driven
-            # externally at the commanded /cmd_vel; the arm must cancel the
+        if self.use_base_jacobian and self.feedback_enabled:
+            # M2 closed-loop: feed-forward the KNOWN base twist. The base is
+            # driven externally at the commanded /cmd_vel; the arm cancels the
             # EE motion that base velocity induces, on top of the reactive
-            # pose-error servo. Subtract J_base @ u_base from the desired EE
-            # twist so the arm-only solve produces the compensating motion.
+            # pose-error servo. Gated by feedback_enabled so the open-loop
+            # baseline gets no base-motion correction at all.
             theta_b = _yaw_from_T(T_base)
             J_base = omx.base_jacobian_world(theta_b, T_base[:3, 3], T_ee[:3, 3])
             v_desired = v_desired - J_base @ self.cmd_vel

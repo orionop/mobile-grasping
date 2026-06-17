@@ -1,0 +1,23 @@
+# arm_position_controller.yaml
+# Group position controller for reactive servoing (MoveIt-Servo pattern).
+# The Holistic QP outputs joint velocities; controller_node integrates them to a
+# position setpoint (q_cmd = q + q_dot*dt) and streams raw positions here. The
+# JointGroupPositionController forwards them to the PositionJointInterface, and
+# Gazebo's position PID (gazebo_controller.yaml, p=300) drives joint velocity to
+# reach each setpoint -- so the arm holds against gravity AND tracks a streamed
+# moving setpoint without the JointTrajectoryController's re-planning lag.
+#
+# Uses the stock PositionJointInterface transmission (no URDF edits). Replaces
+# the stock arm_controller (JointTrajectoryController) -- do not load both, they
+# claim the same joints.
+#
+# Command topic: /arm_pos_controller/command  (std_msgs/Float64MultiArray)
+# Order matches the QP output: [joint1, joint2, joint3, joint4].
+
+arm_pos_controller:
+  type: position_controllers/JointGroupPositionController
+  joints:
+    - joint1
+    - joint2
+    - joint3
+    - joint4
