@@ -80,17 +80,19 @@ class ControllerNode:
         # unsigned-exponent floats like "1.0e6" as strings, so rosparam can
         # hand back str for slack_penalty etc. float()/int() makes it robust.
         self.control_rate = float(rospy.get_param("~control_rate_hz", 200.0))
-        self.servoing_gain = float(rospy.get_param("~servoing_gain", 0.5))
+        # Higher gain tightens reactive correction (M1 converged fine at 0.5;
+        # M2 needs faster correction of base-induced drift).
+        self.servoing_gain = float(rospy.get_param("~servoing_gain", 1.5))
         # M1: False (J_base = 0).  M2: True (real diff-drive J_base).
         self.use_base_jacobian = bool(rospy.get_param("~use_base_jacobian", False))
         # "trajectory" (position JointTrajectoryController) or "velocity".
         self.cmd_interface = rospy.get_param("~cmd_interface", "trajectory")
-        self.cmd_lookahead = float(rospy.get_param("~cmd_lookahead", 0.08))
+        self.cmd_lookahead = float(rospy.get_param("~cmd_lookahead", 0.05))
         # Position JointTrajectoryControllers can't track goals restreamed at
         # 200 Hz (each preempt resets the interpolation before it accelerates,
         # giving jitter + near-zero net motion). Keep the QP at control_rate
         # but throttle trajectory publishing to this rate.
-        self.traj_pub_rate = float(rospy.get_param("~traj_pub_rate", 25.0))
+        self.traj_pub_rate = float(rospy.get_param("~traj_pub_rate", 50.0))
         self._last_pub_t = 0.0
         self.arm_cmd_topic = rospy.get_param(
             "~arm_cmd_topic", "/arm_controller/command"
@@ -251,9 +253,13 @@ class ControllerNode:
             traj.joint_names = ARM_JOINT_NAMES
             pt = JointTrajectoryPoint()
             pt.positions = q_cmd.tolist()
-            # No velocity endpoint: commanding the (saturated, sign-flipping)
-            # qdot as an arrival velocity makes the controller overshoot and
-            # vibrate. Position-only waypoints come to rest smoothly.
+            # Velocity endpoint: lets the position controller SUSTAIN the
+            # commanded joint velocity between streamed waypoints instead of
+            # decelerating to rest each cycle. Essential for M2, where the arm
+            # must hold a continuous EE velocity to cancel base motion. Safe
+            # now that task-space relaxation keeps qdot smooth (the earlier
+            # jitter came from saturated, sign-flipping qdot pre-relaxation).
+            pt.velocities = qdot_arm.tolist()
             pt.time_from_start = rospy.Duration(self.cmd_lookahead)
             traj.points = [pt]
             return traj
