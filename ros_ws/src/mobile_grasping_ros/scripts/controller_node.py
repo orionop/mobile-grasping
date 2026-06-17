@@ -80,7 +80,7 @@ class ControllerNode:
         # unsigned-exponent floats like "1.0e6" as strings, so rosparam can
         # hand back str for slack_penalty etc. float()/int() makes it robust.
         self.control_rate = float(rospy.get_param("~control_rate_hz", 200.0))
-        self.servoing_gain = float(rospy.get_param("~servoing_gain", 1.0))
+        self.servoing_gain = float(rospy.get_param("~servoing_gain", 0.5))
         # M1: False (J_base = 0).  M2: True (real diff-drive J_base).
         self.use_base_jacobian = bool(rospy.get_param("~use_base_jacobian", False))
         # "trajectory" (position JointTrajectoryController) or "velocity".
@@ -101,6 +101,12 @@ class ControllerNode:
         v_max_arm = float(rospy.get_param("~v_max_arm", 1.5))
         v_max_base = float(rospy.get_param("~v_max_base", 0.26))
         slack_penalty = float(rospy.get_param("~slack_penalty", 1.0e6))
+        # Task-space relaxation: hard position, soft orientation. A 4-DOF arm
+        # cannot satisfy a full 6-D twist; relaxing the 3 orientation axes
+        # stops the QP from saturating joints and chattering.
+        slack_weights = [float(w) for w in rospy.get_param(
+            "~slack_weights", [1.0e4, 1.0e4, 1.0e4, 1.0e1, 1.0e1, 1.0e1]
+        )]
 
         self.cfg = HolisticQPConfig(
             n_arm=n_arm,
@@ -108,6 +114,7 @@ class ControllerNode:
             v_max_arm=v_max_arm,
             v_max_base=v_max_base,
             slack_penalty=slack_penalty,
+            slack_weights=tuple(slack_weights),
         )
         self.solver = HolisticQPSolver(self.cfg)
 
@@ -233,7 +240,9 @@ class ControllerNode:
             traj.joint_names = ARM_JOINT_NAMES
             pt = JointTrajectoryPoint()
             pt.positions = q_cmd.tolist()
-            pt.velocities = qdot_arm.tolist()
+            # No velocity endpoint: commanding the (saturated, sign-flipping)
+            # qdot as an arrival velocity makes the controller overshoot and
+            # vibrate. Position-only waypoints come to rest smoothly.
             pt.time_from_start = rospy.Duration(self.cmd_lookahead)
             traj.points = [pt]
             return traj

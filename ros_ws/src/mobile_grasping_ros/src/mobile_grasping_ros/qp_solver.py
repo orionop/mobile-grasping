@@ -57,8 +57,15 @@ class HolisticQPConfig:
     v_max_arm: float = 1.5     # rad/s
     v_max_base: float = 0.3    # m/s
 
-    # Slack penalty (higher = tighter tracking)
+    # Slack penalty (higher = tighter tracking). Scalar applied to all 6
+    # end-effector twist components unless slack_weights overrides per-axis.
     slack_penalty: float = 1.0e6
+
+    # Per-component slack weights (vx, vy, vz, wx, wy, wz). Enables
+    # task-space relaxation: on a redundancy-free 4-DOF arm the full 6-D
+    # twist is infeasible, so orientation axes get a low weight (soft) while
+    # position stays hard. None -> use scalar slack_penalty on all axes.
+    slack_weights: Optional[tuple] = None
 
     # QP solver selection
     solver: str = "osqp"
@@ -172,9 +179,13 @@ class HolisticQPSolver:
         # Augmented Jacobian: J = [ J_base | J_arm | I_6 ]
         J_aug = np.hstack([J_base, J_arm, np.eye(n_slack)])
 
-        # Quadratic cost: identity on joint vels, heavy penalty on slack
+        # Quadratic cost: identity on joint vels, penalty on slack.
+        # Per-axis weights enable task-space relaxation (soft orientation).
         Q = np.eye(n_x)
-        Q[n_total:, n_total:] *= self.cfg.slack_penalty
+        if self.cfg.slack_weights is not None:
+            Q[n_total:, n_total:] = np.diag(np.asarray(self.cfg.slack_weights, float))
+        else:
+            Q[n_total:, n_total:] *= self.cfg.slack_penalty
         C = np.zeros(n_x)  # manipulability term will land here later
 
         # Bounds
