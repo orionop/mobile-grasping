@@ -24,6 +24,14 @@
   <arg name="use_sim_time" default="true"/>
   <arg name="gui" default="true"/>
 
+  <!-- Pipeline args, forwarded to pipeline.launch below. -->
+  <arg name="eval" default="false"/>
+  <arg name="eval_csv" default="/tmp/tracking_error.csv"/>
+  <arg name="use_base_jacobian" default="false"/>
+  <arg name="target_x" default="0.25"/>
+  <arg name="target_y" default="0.0"/>
+  <arg name="target_z" default="0.20"/>
+
   <env name="TURTLEBOT3_MODEL" value="$(arg model)"/>
 
   <!-- Gazebo Classic + TB3+OMX-X bring-up (official ROBOTIS launch) -->
@@ -33,7 +41,14 @@
     <arg name="gui" value="$(arg gui)"/>
   </include>
 
-  <!-- Our pipeline nodes -->
-  <include file="$(find mobile_grasping_ros)/launch/pipeline.launch"/>
+  <!-- Our pipeline nodes (args forwarded so eval/target/M2 toggle work). -->
+  <include file="$(find mobile_grasping_ros)/launch/pipeline.launch">
+    <arg name="eval" value="$(arg eval)"/>
+    <arg name="eval_csv" value="$(arg eval_csv)"/>
+    <arg name="use_base_jacobian" value="$(arg use_base_jacobian)"/>
+    <arg name="target_x" value="$(arg target_x)"/>
+    <arg name="target_y" value="$(arg target_y)"/>
+    <arg name="target_z" value="$(arg target_z)"/>
+  </include>
 
 </launch>
