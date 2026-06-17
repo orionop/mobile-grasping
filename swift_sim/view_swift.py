@@ -29,7 +29,7 @@ from run_m2 import solve_arm_qd, feasible_grasp_pose, pose_error
 N_BASE = 2
 
 
-def view(mode, v_base=0.10, drive_dist=0.18, settle=3.0, dt=0.02):
+def view(mode, v_base=0.10, drive_dist=0.08, settle=3.0, dt=0.02):
     robot = make_omx_tb3_mesh()          # real-mesh robot, ETS-identical kinematics
     robot.q = robot.qr
 
@@ -44,7 +44,7 @@ def view(mode, v_base=0.10, drive_dist=0.18, settle=3.0, dt=0.02):
     #    reaching FORWARD-up (extended) and never folds into its own base;
     #  - base rolls 0.18 m, full pose held 100% within 1 cm & 5 deg (max 0.2 cm).
     # Visualisation config; the M1/M2 quantitative figures are unchanged.
-    Tep = feasible_grasp_pose([0.20, 0.0, 0.20])
+    Tep = feasible_grasp_pose([0.12, 0.0, 0.20])
     env.add(sg.Sphere(0.02, pose=Tep, color=[0.2, 0.8, 0.2, 0.8]))
 
     feedback = (mode != "m2-open")
