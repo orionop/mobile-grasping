@@ -136,3 +136,4 @@ datasets/
 *.pid.lock
 .cache/
 *.bak
+swift_venv/
