@@ -14,10 +14,17 @@ Subscribed:
   /base_pose       (geometry_msgs/PoseStamped)  -- fused base pose
   /joint_states    (sensor_msgs/JointState)     -- current arm joint state
 
-Published:
-  <arm_cmd_topic>  (std_msgs/Float64MultiArray) -- joint velocity command
-                   Default: /arm_controller/command
-                   Check via: rosservice call /controller_manager/list_controllers
+Published (depends on cmd_interface):
+  trajectory mode (default, for position_controllers/JointTrajectoryController):
+    /arm_controller/command (trajectory_msgs/JointTrajectory)
+  velocity mode (for velocity_controllers/* or hardware velocity interface):
+    <arm_cmd_topic> (std_msgs/Float64MultiArray)
+
+The stock ROBOTIS TB3+OMX-X Gazebo bring-up loads arm_controller as a
+position_controllers/JointTrajectoryController on a PositionJointInterface,
+so trajectory mode is the default: the QP joint *velocities* are integrated
+to a position setpoint (q_cmd = q + qdot*cmd_lookahead) and streamed as a
+one-point JointTrajectory each cycle.
 
 Parameters (from controller_params.yaml + inline)
 --------------------------------------------------
@@ -28,7 +35,9 @@ Parameters (from controller_params.yaml + inline)
   v_max_base       : float, base linear velocity bound, m/s
   slack_penalty    : float, slack penalty in the QP cost
   servoing_gain    : float, PBS gain (default 1.0)
-  arm_cmd_topic    : str, topic to publish arm velocity command
+  cmd_interface    : str, "trajectory" (default) or "velocity"
+  cmd_lookahead    : float, integration horizon for trajectory mode, s (default 0.1)
+  arm_cmd_topic    : str, command topic (default /arm_controller/command)
   use_base_jacobian: bool, False=M1 (base stationary), True=M2 (base moving)
 """
 
@@ -38,6 +47,7 @@ import rospy
 from geometry_msgs.msg import PoseStamped
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Float64MultiArray
+from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from tf.transformations import quaternion_matrix
 
 from mobile_grasping_ros.qp_solver import HolisticQPSolver, HolisticQPConfig
@@ -71,6 +81,9 @@ class ControllerNode:
         self.servoing_gain = rospy.get_param("~servoing_gain", 1.0)
         # M1: False (J_base = 0).  M2: True (real diff-drive J_base).
         self.use_base_jacobian = rospy.get_param("~use_base_jacobian", False)
+        # "trajectory" (position JointTrajectoryController) or "velocity".
+        self.cmd_interface = rospy.get_param("~cmd_interface", "trajectory")
+        self.cmd_lookahead = rospy.get_param("~cmd_lookahead", 0.1)
         self.arm_cmd_topic = rospy.get_param(
             "~arm_cmd_topic", "/arm_controller/command"
         )
@@ -100,16 +113,21 @@ class ControllerNode:
         rospy.Subscriber("/base_pose", PoseStamped, self._on_base_pose)
         rospy.Subscriber("/joint_states", JointState, self._on_joint_state)
 
-        # Publisher
-        self.cmd_pub = rospy.Publisher(
-            self.arm_cmd_topic, Float64MultiArray, queue_size=10
-        )
+        # Publisher (message type depends on cmd_interface)
+        if self.cmd_interface == "trajectory":
+            self.cmd_pub = rospy.Publisher(
+                self.arm_cmd_topic, JointTrajectory, queue_size=1
+            )
+        else:
+            self.cmd_pub = rospy.Publisher(
+                self.arm_cmd_topic, Float64MultiArray, queue_size=10
+            )
 
         rospy.loginfo(
             "Controller node up: %d-DOF arm, %d-DOF base, %.0f Hz, "
-            "cmd→%s, use_base_J=%s",
+            "cmd→%s (%s), use_base_J=%s",
             n_arm, n_base, self.control_rate,
-            self.arm_cmd_topic, self.use_base_jacobian,
+            self.arm_cmd_topic, self.cmd_interface, self.use_base_jacobian,
         )
 
     # ------------------------------------------------------------------
@@ -132,7 +150,8 @@ class ControllerNode:
         while not rospy.is_shutdown():
             if self._ready():
                 cmd = self._compute_command()
-                self.cmd_pub.publish(cmd)
+                if cmd is not None:
+                    self.cmd_pub.publish(cmd)
             rate.sleep()
 
     def _ready(self):
@@ -181,15 +200,32 @@ class ControllerNode:
 
         return self.servoing_gain * np.concatenate([delta_p, delta_r])
 
+    def _build_msg(self, qdot_arm: np.ndarray, q: np.ndarray):
+        """Pack QP velocity output into the configured message type."""
+        if self.cmd_interface == "trajectory":
+            # Integrate velocity to a position setpoint and stream a
+            # single-point JointTrajectory for the position controller.
+            q_cmd = q + qdot_arm * self.cmd_lookahead
+            traj = JointTrajectory()
+            traj.header.stamp = rospy.Time.now()
+            traj.joint_names = ARM_JOINT_NAMES
+            pt = JointTrajectoryPoint()
+            pt.positions = q_cmd.tolist()
+            pt.velocities = qdot_arm.tolist()
+            pt.time_from_start = rospy.Duration(self.cmd_lookahead)
+            traj.points = [pt]
+            return traj
+        msg = Float64MultiArray()
+        msg.data = qdot_arm.tolist()
+        return msg
+
     # ------------------------------------------------------------------
     # Main compute
     # ------------------------------------------------------------------
-    def _compute_command(self) -> Float64MultiArray:
+    def _compute_command(self):
         q = self._extract_arm_joints()
         if q is None:
-            msg = Float64MultiArray()
-            msg.data = [0.0] * self.cfg.n_arm
-            return msg
+            return None   # don't command a setpoint we can't anchor to current q
 
         T_base = _pose_to_T(self.base_pose.pose)
         T_ee = omx.fk_world(q, T_base)
@@ -216,9 +252,7 @@ class ControllerNode:
             np.linalg.norm(slack),
         )
 
-        msg = Float64MultiArray()
-        msg.data = qdot_arm.tolist()
-        return msg
+        return self._build_msg(qdot_arm, q)
 
 
 if __name__ == "__main__":

@@ -13,6 +13,8 @@ find_package(catkin REQUIRED COMPONENTS
   geometry_msgs
   sensor_msgs
   nav_msgs
+  trajectory_msgs
+  tf
 )
 
 catkin_python_setup()
@@ -24,6 +26,8 @@ catkin_package(
     geometry_msgs
     sensor_msgs
     nav_msgs
+    trajectory_msgs
+    tf
 )
 
 include_directories(
