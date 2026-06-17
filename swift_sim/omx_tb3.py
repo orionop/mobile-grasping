@@ -30,8 +30,10 @@ from roboticstoolbox import ET
 TB3_V_MAX = 0.26          # m/s   base forward
 TB3_W_MAX = 1.82          # rad/s base yaw (0.26 / (0.287/2))
 
-# OMX-X joint velocity limit (URDF velocity=4.8 rad/s; use a safe 1.5 for sim).
-OMX_QD_MAX = 1.5          # rad/s per arm joint
+# OMX-X joint velocity limit. The real Dynamixel XM430-W350 joints do ~4.8 rad/s
+# (URDF velocity=4.8). An earlier conservative 1.5 saturated the arm at higher
+# base speeds (it could not compensate >0.10 m/s); use the real spec.
+OMX_QD_MAX = 4.8          # rad/s per arm joint
 
 N_BASE = 2
 N_ARM = 4
