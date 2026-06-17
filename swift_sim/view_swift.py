@@ -83,10 +83,11 @@ def view(mode, v_base=0.10, drive_dist=0.08, settle=3.0, dt=0.02,
             pe, oe = pose_error(robot.fkine(robot.q), Tep)
             if pe < 0.01 and oe < 5.0:
                 hold_dist = dist
-            # Continuous mode: stop once the dot leaves reach (grasp lost), so
-            # the run shows only the arm actively compensating -- no frozen
-            # failure tail where the base keeps rolling past an unreachable dot.
-            if continuous and feedback and pe > 0.03:
+            # Continuous mode: drive until the arm has swept through its full
+            # compensation (forward-reach -> vertical -> leaning back) and just
+            # starts to lose the dot. Stop there, before the frozen failure tail
+            # where the base rolls on past an unreachable dot.
+            if continuous and feedback and pe > 0.05:
                 break
         t += dt
 
