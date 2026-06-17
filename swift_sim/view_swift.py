@@ -37,13 +37,14 @@ def view(mode, v_base=0.10, drive_dist=0.18, settle=3.0, dt=0.02):
     env.launch(realtime=True)
     env.add(robot)                       # renders the OMX-X + TB3 meshes
 
-    # Target stays AHEAD of the base (0.08 m gap, no overlap); the base rolls
-    # 0.18 m forward and the arm reaches forward to hold the pose (extended, no
-    # self-collision). This is the maximum clean base travel: beyond ~0.18 m the
-    # arm folds toward the base or the 4-DOF hold collapses. Full pose held ~89%
-    # within 1 cm & 5 deg (max ~1.8 cm). Visualisation config; the M1/M2
-    # quantitative figures are unchanged.
-    Tep = feasible_grasp_pose([0.26, 0.0, 0.06])
+    # Clean on-the-move visual:
+    #  - target ELEVATED (z=0.20, above the ~0.14 m Waffle base) so the base
+    #    body never intersects the grasp marker as it rolls underneath;
+    #  - EE stays ahead of the base centre the whole pass, so the arm is always
+    #    reaching FORWARD-up (extended) and never folds into its own base;
+    #  - base rolls 0.18 m, full pose held 100% within 1 cm & 5 deg (max 0.2 cm).
+    # Visualisation config; the M1/M2 quantitative figures are unchanged.
+    Tep = feasible_grasp_pose([0.26, 0.0, 0.20])
     env.add(sg.Sphere(0.02, pose=Tep, color=[0.2, 0.8, 0.2, 0.8]))
 
     feedback = (mode != "m2-open")
