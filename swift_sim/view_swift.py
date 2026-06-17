@@ -29,7 +29,7 @@ from run_m2 import solve_arm_qd, feasible_grasp_pose, pose_error
 N_BASE = 2
 
 
-def view(mode, v_base=0.10, drive_dist=0.15, settle=3.0, dt=0.02):
+def view(mode, v_base=0.10, drive_dist=0.18, settle=3.0, dt=0.02):
     robot = make_omx_tb3_mesh()          # real-mesh robot, ETS-identical kinematics
     robot.q = robot.qr
 
@@ -37,7 +37,13 @@ def view(mode, v_base=0.10, drive_dist=0.15, settle=3.0, dt=0.02):
     env.launch(realtime=True)
     env.add(robot)                       # renders the OMX-X + TB3 meshes
 
-    Tep = feasible_grasp_pose([0.22, 0.0, 0.06])
+    # Grasp target placed mid-travel so the BASE drives past it while the arm
+    # holds the pose -- the on-the-move "grasp while driving past" visual.
+    # (Visualisation choice. The quantitative M1/M2 result uses a target the
+    # base stops short of, where the full pose holds 100%; here the base passes
+    # it and the hold is ~88% with brief <2.5 cm excursions at the extremes --
+    # the 4-DOF workspace edge. Same controller, same code.)
+    Tep = feasible_grasp_pose([0.08, 0.0, 0.06])
     env.add(sg.Sphere(0.02, pose=Tep, color=[0.2, 0.8, 0.2, 0.8]))
 
     feedback = (mode != "m2-open")
