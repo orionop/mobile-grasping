@@ -36,6 +36,11 @@
   <arg name="target_y" default="0.0"/>
   <arg name="target_z" default="0.20"/>
 
+  <!-- Optional moving target (diagnostic: isolate arm velocity tracking). -->
+  <arg name="target_vx" default="0.0"/>
+  <arg name="target_vy" default="0.0"/>
+  <arg name="target_vz" default="0.0"/>
+
   <!-- Controller -->
   <node pkg="mobile_grasping_ros" type="controller_node.py"
         name="mobile_grasping_controller" output="screen">
@@ -62,6 +67,9 @@
     <param name="x" value="$(arg target_x)"/>
     <param name="y" value="$(arg target_y)"/>
     <param name="z" value="$(arg target_z)"/>
+    <param name="vx" value="$(arg target_vx)"/>
+    <param name="vy" value="$(arg target_vy)"/>
+    <param name="vz" value="$(arg target_vz)"/>
     <param name="frame_id" value="world"/>
   </node>
 

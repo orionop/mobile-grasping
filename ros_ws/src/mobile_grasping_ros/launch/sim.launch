@@ -31,6 +31,9 @@
   <arg name="target_x" default="0.25"/>
   <arg name="target_y" default="0.0"/>
   <arg name="target_z" default="0.20"/>
+  <arg name="target_vx" default="0.0"/>
+  <arg name="target_vy" default="0.0"/>
+  <arg name="target_vz" default="0.0"/>
 
   <env name="TURTLEBOT3_MODEL" value="$(arg model)"/>
 
@@ -49,6 +52,9 @@
     <arg name="target_x" value="$(arg target_x)"/>
     <arg name="target_y" value="$(arg target_y)"/>
     <arg name="target_z" value="$(arg target_z)"/>
+    <arg name="target_vx" value="$(arg target_vx)"/>
+    <arg name="target_vy" value="$(arg target_vy)"/>
+    <arg name="target_vz" value="$(arg target_vz)"/>
   </include>
 
 </launch>
