@@ -25,22 +25,31 @@ from matplotlib.animation import FuncAnimation, FFMpegWriter
 import spatialmath as sm
 
 from omx_tb3 import make_omx_tb3, N_BASE
-from run_m2 import solve_arm_qd
+from run_m2 import solve_arm_qd, feasible_grasp_pose, pose_error
 
 
-def simulate(feedback, v_base, drive_time=5.0, settle=2.5, dt=0.02):
-    """Run the M1/M2 loop; return (qtraj, phases, robot, Tep, errs)."""
+GRASP_POSE = feasible_grasp_pose([0.22, 0.0, 0.06])
+
+
+def simulate(feedback, v_base, drive_dist=0.15, settle=3.0, dt=0.02):
+    """Run the M1/M2 loop; return (qtraj, phases, robot, Tep, errs).
+
+    M1 = v_base 0 (base never moves). M2 = base drives a fixed distance while
+    the arm holds the feasible grasp pose.
+    """
     robot = make_omx_tb3()
     robot.q = robot.qr
-    Tep = sm.SE3(0.20, 0.10, 0.18) * sm.SE3.OA([0, 1, 0], [0, 0, -1])
+    Tep = GRASP_POSE
 
     qtraj, phases, errs = [], [], []
     q_latched = None
     t = 0.0
-    while t < settle + drive_time:
+    dist = 0.0
+    while t < settle or (v_base > 0 and dist < drive_dist):
         driving = t >= settle
         if driving and v_base > 0:
             robot.q[1] += v_base * dt
+            dist += v_base * dt
         if q_latched is None:
             q_latched = robot.q.copy()
 
@@ -57,8 +66,11 @@ def simulate(feedback, v_base, drive_time=5.0, settle=2.5, dt=0.02):
 
         qtraj.append(robot.q.copy())
         phases.append("drive" if driving else "settle")
-        errs.append(float(np.linalg.norm(Tep.t - robot.fkine(robot.q).t)))
+        pe, _ = pose_error(robot.fkine(robot.q), Tep)
+        errs.append(pe)
         t += dt
+        if v_base == 0 and t >= settle:    # M1: end shortly after settle
+            break
     return np.array(qtraj), phases, robot, Tep, errs
 
 
