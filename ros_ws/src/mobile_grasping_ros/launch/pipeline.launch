@@ -21,13 +21,32 @@
   <arg name="predictor_rate_hz" default="30.0"/>
   <arg name="estimator_rate_hz" default="50.0"/>
 
+  <!-- M1: base stationary (J_base = 0). M2: set true for base-motion compensation. -->
+  <arg name="use_base_jacobian" default="false"/>
+  <arg name="arm_cmd_topic" default="/arm_controller/command"/>
+
+  <!-- Tracking-error logging for Exp 1 figure. Set eval:=true to record. -->
+  <arg name="eval" default="false"/>
+  <arg name="eval_csv" default="/tmp/tracking_error.csv"/>
+
   <!-- Controller -->
   <node pkg="mobile_grasping_ros" type="controller_node.py"
         name="mobile_grasping_controller" output="screen">
     <rosparam command="load"
               file="$(find mobile_grasping_ros)/config/controller_params.yaml"/>
     <param name="control_rate_hz" value="$(arg control_rate_hz)"/>
+    <param name="use_base_jacobian" value="$(arg use_base_jacobian)"/>
+    <param name="arm_cmd_topic" value="$(arg arm_cmd_topic)"/>
   </node>
+
+  <!-- Eval logger (tracking error -> CSV). Off unless eval:=true. -->
+  <group if="$(arg eval)">
+    <node pkg="mobile_grasping_ros" type="eval_node.py"
+          name="mobile_grasping_eval" output="screen">
+      <param name="out_csv" value="$(arg eval_csv)"/>
+      <param name="log_rate_hz" value="50.0"/>
+    </node>
+  </group>
 
   <!-- Predictor (placeholder fixed pose for bring-up) -->
   <node pkg="mobile_grasping_ros" type="predictor_node.py"

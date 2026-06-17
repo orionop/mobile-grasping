@@ -36,6 +36,7 @@ catkin_install_python(PROGRAMS
   scripts/controller_node.py
   scripts/predictor_node.py
   scripts/estimator_node.py
+  scripts/eval_node.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
